@@ -1,12 +1,12 @@
 #!/bin/bash
-# Download and setup Llama 3.2 3B model
+# Download and setup Qwen 2.5 0.5B model (open source alternative)
 
 set -e
 
-echo "===== Llama 3.2 3B Model Download ====="
+echo "===== Qwen 2.5 0.5B Model Download ====="
 echo ""
-echo "This script will download the Llama 3.2 3B Instruct model."
-echo "Model size: ~6.5 GB (8-bit quantized)"
+echo "This script will download the Qwen 2.5 0.5B Instruct model."
+echo "Model size: ~1.2 GB (smaller, open source alternative)"
 echo ""
 
 # Create models directory
@@ -14,7 +14,7 @@ MODELS_DIR="../models"
 mkdir -p "$MODELS_DIR"
 
 # Check if model already exists
-MODEL_PATH="$MODELS_DIR/Llama-3.2-3B-Instruct"
+MODEL_PATH="$MODELS_DIR/Qwen2.5-0.5B-Instruct"
 
 if [ -d "$MODEL_PATH" ]; then
     echo "✓ Model already exists at $MODEL_PATH"
@@ -29,8 +29,6 @@ fi
 
 echo ""
 echo "Downloading model from HuggingFace..."
-echo "Note: You may need to login to HuggingFace first:"
-echo "  huggingface-cli login"
 echo ""
 
 # Check if huggingface-cli is available
@@ -41,7 +39,7 @@ fi
 
 # Download model
 echo "Starting download..."
-huggingface-cli download meta-llama/Llama-3.2-3B-Instruct \
+huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct \
     --local-dir "$MODEL_PATH" \
     --local-dir-use-symlinks False
 

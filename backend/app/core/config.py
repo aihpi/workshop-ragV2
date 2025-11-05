@@ -1,6 +1,7 @@
 """Configuration management for the RAG backend."""
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Union
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -11,7 +12,16 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "RAG Backend"
     
     # CORS Settings
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    BACKEND_CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000"]
+    
+    @field_validator('BACKEND_CORS_ORIGINS', mode='before')
+    @classmethod
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
+        if isinstance(v, str) and not v.startswith('['):
+            return [i.strip() for i in v.split(',')]
+        elif isinstance(v, (list, str)):
+            return v
+        raise ValueError(v)
     
     # Qdrant Settings
     QDRANT_HOST: str = "localhost"
@@ -25,7 +35,7 @@ class Settings(BaseSettings):
     # LLM Settings
     VLLM_HOST: str = "localhost"
     VLLM_PORT: int = 8001
-    LLM_MODEL: str = "meta-llama/Llama-3.2-3B-Instruct"
+    LLM_MODEL: str = "Qwen/Qwen2.5-0.5B-Instruct"
     LLM_MAX_TOKENS: int = 512
     LLM_TEMPERATURE: float = 0.7
     LLM_TOP_P: float = 0.9

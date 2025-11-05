@@ -13,6 +13,7 @@ class QueryRequest(BaseModel):
     top_k_sampling: int = Field(40, ge=1, le=100, description="Top-k sampling parameter")
     use_chat_history: bool = Field(False, description="Whether to use chat history")
     chat_id: Optional[str] = Field(None, description="Chat session ID")
+    prompt: Optional[str] = Field(None, description="Custom prompt template")
 
 
 class RetrievedChunk(BaseModel):

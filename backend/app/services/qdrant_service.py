@@ -1,5 +1,7 @@
 """Qdrant vector database service."""
 from typing import List, Dict, Optional
+import hashlib
+import uuid
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -23,6 +25,24 @@ class QdrantService:
         )
         self.collection_name = settings.QDRANT_COLLECTION
         self._ensure_collection()
+    
+    def _generate_point_id(self, document_id: str, chunk_index: int) -> str:
+        """Generate a valid UUID from document ID and chunk index.
+        
+        Args:
+            document_id: Document identifier
+            chunk_index: Chunk index
+            
+        Returns:
+            Valid UUID string
+        """
+        # Create a deterministic UUID from document_id and chunk_index
+        combined = f"{document_id}_{chunk_index}"
+        hash_object = hashlib.sha256(combined.encode())
+        hex_dig = hash_object.hexdigest()
+        # Convert to UUID format
+        uuid_str = f"{hex_dig[:8]}-{hex_dig[8:12]}-{hex_dig[12:16]}-{hex_dig[16:20]}-{hex_dig[20:32]}"
+        return uuid_str
     
     def _ensure_collection(self):
         """Ensure collection exists, create if not."""
@@ -55,7 +75,7 @@ class QdrantService:
         """
         points = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            point_id = f"{document_id}_{i}"
+            point_id = self._generate_point_id(document_id, i)
             payload = {
                 "document_id": document_id,
                 "chunk_index": i,

@@ -1,5 +1,6 @@
 """LLM service using vLLM."""
 import httpx
+import json
 from typing import AsyncGenerator, Optional, List, Dict
 from app.core.config import settings
 
@@ -10,7 +11,29 @@ class LLMService:
     def __init__(self):
         """Initialize LLM service."""
         self.base_url = f"http://{settings.VLLM_HOST}:{settings.VLLM_PORT}"
-        self.model = settings.LLM_MODEL
+        self.default_model = settings.LLM_MODEL
+    
+    async def get_active_model(self) -> str:
+        """Get the currently active model from the models API."""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get("http://localhost:8080/api/v1/models/models/active")
+                if response.status_code == 200:
+                    data = response.json()
+                    active_model = data.get("active_model")
+                    if active_model:
+                        # Convert our model ID to the HuggingFace model name
+                        model_mapping = {
+                            "qwen2.5:1.5b-instruct": "Qwen/Qwen2.5-1.5B-Instruct",
+                            "qwen2.5:3b-instruct": "Qwen/Qwen2.5-3B-Instruct", 
+                            "qwen2.5:7b-instruct": "Qwen/Qwen2.5-7B-Instruct"
+                        }
+                        return model_mapping.get(active_model, self.default_model)
+        except Exception as e:
+            print(f"Error getting active model: {e}")
+            # Fallback to default model if API call fails
+            pass
+        return self.default_model
     
     def create_prompt(
         self,
@@ -69,7 +92,7 @@ Please provide a comprehensive answer based on the documents above. If the docum
         top_p: float = 0.9,
         top_k: int = 40,
     ) -> AsyncGenerator[str, None]:
-        """Generate streaming response from LLM.
+        """Generate streaming response from LLM using vLLM.
         
         Args:
             prompt: Input prompt
@@ -81,12 +104,14 @@ Please provide a comprehensive answer based on the documents above. If the docum
         Yields:
             Generated text tokens
         """
+        model = await self.get_active_model()
+        
         async with httpx.AsyncClient(timeout=300.0) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/v1/completions",
                 json={
-                    "model": self.model,
+                    "model": model,
                     "prompt": prompt,
                     "max_tokens": max_tokens,
                     "temperature": temperature,
@@ -101,7 +126,6 @@ Please provide a comprehensive answer based on the documents above. If the docum
                         if data == "[DONE]":
                             break
                         try:
-                            import json
                             chunk = json.loads(data)
                             if "choices" in chunk and len(chunk["choices"]) > 0:
                                 text = chunk["choices"][0].get("text", "")
@@ -118,7 +142,7 @@ Please provide a comprehensive answer based on the documents above. If the docum
         top_p: float = 0.9,
         top_k: int = 40,
     ) -> str:
-        """Generate non-streaming response from LLM.
+        """Generate non-streaming response from LLM using vLLM.
         
         Args:
             prompt: Input prompt
@@ -130,11 +154,13 @@ Please provide a comprehensive answer based on the documents above. If the docum
         Returns:
             Generated text
         """
+        model = await self.get_active_model()
+        
         async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(
                 f"{self.base_url}/v1/completions",
                 json={
-                    "model": self.model,
+                    "model": model,
                     "prompt": prompt,
                     "max_tokens": max_tokens,
                     "temperature": temperature,

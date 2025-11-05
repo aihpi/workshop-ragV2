@@ -1,7 +1,7 @@
 // API client for RAG backend
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export interface Document {
   document_id: string;
@@ -21,6 +21,7 @@ export interface QueryRequest {
   top_k_sampling?: number;
   use_chat_history?: boolean;
   chat_id?: string;
+  prompt?: string;
 }
 
 export interface RetrievedChunk {
@@ -29,6 +30,7 @@ export interface RetrievedChunk {
   filename: string;
   chunk_index: number;
   score: number;
+  metadata?: Record<string, any>;
 }
 
 export interface QueryResponse {
@@ -49,6 +51,14 @@ export interface ChatMessage {
   query: string;
   answer: string;
   chunks: RetrievedChunk[];
+}
+
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  template: string;
+  description: string;
+  isActive: boolean;
 }
 
 const api = axios.create({
@@ -86,6 +96,17 @@ export const syncDocuments = async () => {
 };
 
 // Query APIs
+export const searchDocuments = async (query: string, topK: number = 10, scoreThreshold: number = 0.0): Promise<RetrievedChunk[]> => {
+  const response = await api.get('/query/search', {
+    params: {
+      query,
+      top_k: topK,
+      score_threshold: scoreThreshold
+    }
+  });
+  return response.data.chunks || [];
+};
+
 export const queryRAG = async (request: QueryRequest): Promise<QueryResponse> => {
   const response = await api.post('/query/query', request);
   return response.data;
@@ -108,6 +129,7 @@ export const queryRAGStream = (
       top_k_sampling: String(request.top_k_sampling || 40),
       use_chat_history: String(request.use_chat_history || false),
       ...(request.chat_id && { chat_id: request.chat_id }),
+      ...(request.prompt && { prompt: request.prompt }),
     })}`
   );
 
@@ -158,6 +180,106 @@ export const getChatHistory = async (sessionId: string): Promise<ChatMessage[]> 
 export const deleteChatSession = async (sessionId: string) => {
   const response = await api.delete(`/chat/${sessionId}`);
   return response.data;
+};
+
+// Prompt APIs
+export const getPrompts = async (): Promise<PromptTemplate[]> => {
+  try {
+    const response = await api.get('/prompts');
+    return response.data.prompts;
+  } catch (error) {
+    // If endpoint doesn't exist yet, return empty array
+    console.warn('Prompts API not available, using local state');
+    return [];
+  }
+};
+
+export const savePrompts = async (prompts: PromptTemplate[]) => {
+  try {
+    const response = await api.post('/prompts', { prompts });
+    return response.data;
+  } catch (error) {
+    // If endpoint doesn't exist yet, just log the warning
+    console.warn('Prompts API not available, changes will not persist');
+    throw error;
+  }
+};
+
+export const getActivePrompt = async (): Promise<PromptTemplate | null> => {
+  try {
+    const response = await api.get('/prompts/active');
+    return response.data.prompt;
+  } catch (error) {
+    console.warn('Active prompt API not available');
+    return null;
+  }
+};
+
+// Model Management Types and Functions
+export interface ModelInfo {
+  id: string;
+  name: string;
+  downloaded: boolean;
+  active: boolean;
+  size?: string;
+  downloadProgress?: number;
+}
+
+export interface DownloadProgress {
+  model_id: string;
+  progress: number;
+  status: 'downloading' | 'completed' | 'error';
+  message?: string;
+}
+
+export const getAvailableModels = async (): Promise<ModelInfo[]> => {
+  try {
+    const response = await api.get('/models/models');
+    return response.data.models;
+  } catch (error) {
+    console.error('Error fetching models:', error);
+    return [];
+  }
+};
+
+export const downloadModel = async (modelId: string): Promise<boolean> => {
+  try {
+    await api.post('/models/models/download', { model_id: modelId });
+    return true;
+  } catch (error) {
+    console.error('Error downloading model:', error);
+    return false;
+  }
+};
+
+export const setActiveModel = async (modelId: string): Promise<boolean> => {
+  try {
+    await api.post('/models/models/set-active', { model_id: modelId });
+    return true;
+  } catch (error) {
+    console.error('Error setting active model:', error);
+    return false;
+  }
+};
+
+export const deleteModel = async (modelId: string): Promise<boolean> => {
+  try {
+    await api.delete(`/models/models/${modelId}`);
+    return true;
+  } catch (error) {
+    console.error('Error deleting model:', error);
+    return false;
+  }
+};
+
+export const getDownloadProgress = async (modelId: string): Promise<DownloadProgress | null> => {
+  try {
+    const response = await api.get(`/models/models/download-progress/${modelId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching download progress:', error);
+    return null;
+  }
 };
 
 export default api;

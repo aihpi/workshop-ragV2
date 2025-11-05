@@ -13,7 +13,8 @@ class EmbeddingService:
         Args:
             model_name: Name of the SentenceTransformer model
         """
-        self.model = SentenceTransformer(model_name)
+        # Force CPU usage to avoid GPU memory conflicts with vLLM
+        self.model = SentenceTransformer(model_name, device='cpu')
         self.embedding_dim = self.model.get_sentence_embedding_dimension()
     
     def embed_text(self, text: str) -> List[float]:

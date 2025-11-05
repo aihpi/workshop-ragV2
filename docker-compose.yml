@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./models:/models
+    command:
+      - --model
+      - /models/Llama-3.2-3B-Instruct
+      - --port
+      - "8001"
+      - --max-model-len
+      - "8192"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./chat_history:/app/chat_history
+    environment:
+      - QDRANT_HOST=qdrant
+      - VLLM_HOST=vllm
+    depends_on:
+      - qdrant
+      - vllm
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  qdrant_storage:
+  data:
+  chat_history:

@@ -1,656 +1,638 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  listDocuments, 
-  deleteDocument, 
-  syncDocuments, 
-  Document,
-  getAvailableModels,
-  downloadModel,
-  setActiveModel,
-  deleteModel,
-  getDownloadProgress,
-  ModelInfo,
-  DownloadProgress
-} from '../services/api';
+import React, { useState } from 'react';
+import PromptManagement from './PromptManagement';
+import DocumentManagement from './DocumentManagement';
+import { theme } from '../theme';
 
-const Settings: React.FC = () => {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string>('');
-  
-  // Model management state
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('');
-  const [downloadingModels, setDownloadingModels] = useState<Record<string, number>>({});
-  const [modelLoading, setModelLoading] = useState(false);
+interface SettingsProps {
+  onBackToChat?: () => void;
+  prompts?: any[];
+  setPrompts?: (prompts: any[]) => void;
+}
 
-  // Model and System Information
-  const [systemInfo] = useState({
-    backendUrl: import.meta.env.VITE_API_URL || 'http://localhost:8005',
-    embeddingModel: 'sentence-transformers/all-MiniLM-L6-v2',
-    llmModel: 'Qwen/Qwen2.5-0.5B-Instruct',
-    vectorDatabase: 'Qdrant',
-    vectorDimensions: 384,
-    chunkSize: 512,
-    chunkOverlap: 128
-  });
+type SettingsSection = 
+  | 'prompt-management' 
+  | 'query-transformation' 
+  | 'data' 
+  | 'customize' 
+  | 'model-configuration' 
+  | 'information';
 
-  const loadDocuments = async () => {
-    setLoading(true);
-    try {
-      const docs = await listDocuments();
-      setDocuments(docs);
-    } catch (error) {
-      console.error('Error loading documents:', error);
-      // Don't show alert for documents in Settings - it's optional
-      setDocuments([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+const Settings: React.FC<SettingsProps> = ({ onBackToChat, prompts, setPrompts }) => {
+  const [activeSection, setActiveSection] = useState<SettingsSection>('prompt-management');
 
-  const loadModels = async () => {
-    setModelLoading(true);
-    try {
-      const availableModels = await getAvailableModels();
-      setModels(availableModels);
-      
-      // Initialize with default models if none from backend
-      if (availableModels.length === 0) {
-        const defaultModels: ModelInfo[] = [
-          { id: 'qwen2.5:1.5b-instruct', name: 'Qwen2.5 1.5B Instruct', downloaded: false, active: false },
-          { id: 'qwen2.5:3b-instruct', name: 'Qwen2.5 3B Instruct', downloaded: false, active: false },
-          { id: 'qwen2.5:7b-instruct', name: 'Qwen2.5 7B Instruct', downloaded: false, active: false }
-        ];
-        setModels(defaultModels);
-      }
-    } catch (error) {
-      console.error('Error loading models:', error);
-      // Set default models on error
-      const defaultModels: ModelInfo[] = [
-        { id: 'qwen2.5:1.5b-instruct', name: 'Qwen2.5 1.5B Instruct', downloaded: false, active: false },
-        { id: 'qwen2.5:3b-instruct', name: 'Qwen2.5 3B Instruct', downloaded: false, active: false },
-        { id: 'qwen2.5:7b-instruct', name: 'Qwen2.5 7B Instruct', downloaded: false, active: false }
-      ];
-      setModels(defaultModels);
-    } finally {
-      setModelLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDocuments();
-    loadModels();
-  }, []);
-
-  const handleDeleteDocument = async (documentId: string, filename: string) => {
-    if (!confirm(`Are you sure you want to delete "${filename}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      await deleteDocument(documentId);
-      setDocuments(prev => prev.filter(doc => doc.document_id !== documentId));
-      alert('Document deleted successfully');
-    } catch (error) {
-      console.error('Error deleting document:', error);
-      alert('Error deleting document. Please try again.');
-    }
-  };
-
-  const handleSyncDocuments = async () => {
-    setLoading(true);
-    setUploadProgress('Syncing documents with vector database...');
-    try {
-      await syncDocuments();
-      await loadDocuments();
-      setUploadProgress('Sync completed successfully');
-      setTimeout(() => setUploadProgress(''), 3000);
-    } catch (error) {
-      console.error('Error syncing documents:', error);
-      setUploadProgress('Sync failed. Please try again.');
-      setTimeout(() => setUploadProgress(''), 3000);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDownloadModel = async (modelId: string) => {
-    try {
-      setDownloadingModels(prev => ({ ...prev, [modelId]: 0 }));
-      
-      const success = await downloadModel(modelId);
-      if (success) {
-        // Poll backend for real progress updates
-        const progressInterval = setInterval(async () => {
-          try {
-            const progressData = await getDownloadProgress(modelId);
-            if (progressData) {
-              const progress = progressData.progress;
-              setDownloadingModels(prev => ({ ...prev, [modelId]: progress }));
-              
-              if (progressData.status === 'completed' || progress >= 100) {
-                clearInterval(progressInterval);
-                setDownloadingModels(prev => {
-                  const newState = { ...prev };
-                  delete newState[modelId];
-                  return newState;
-                });
-                // Update model as downloaded and reload models
-                await loadModels();
-              } else if (progressData.status === 'error') {
-                clearInterval(progressInterval);
-                setDownloadingModels(prev => {
-                  const newState = { ...prev };
-                  delete newState[modelId];
-                  return newState;
-                });
-                alert('Download failed. Please try again.');
-              }
-            }
-          } catch (error) {
-            // If we can't get progress, the download might be done
-            clearInterval(progressInterval);
-            setDownloadingModels(prev => {
-              const newState = { ...prev };
-              delete newState[modelId];
-              return newState;
-            });
-            // Reload models to check if download completed
-            await loadModels();
-          }
-        }, 2000); // Poll every 2 seconds
-        
-        // Set a timeout to stop polling after 10 minutes
-        setTimeout(() => {
-          clearInterval(progressInterval);
-          setDownloadingModels(prev => {
-            const newState = { ...prev };
-            delete newState[modelId];
-            return newState;
-          });
-        }, 600000); // 10 minutes
-      } else {
-        setDownloadingModels(prev => {
-          const newState = { ...prev };
-          delete newState[modelId];
-          return newState;
-        });
-        alert('Failed to start download. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error downloading model:', error);
-      setDownloadingModels(prev => {
-        const newState = { ...prev };
-        delete newState[modelId];
-        return newState;
-      });
-      alert('Error downloading model. Please try again.');
-    }
-  };
-
-  const handleSetActiveModel = async (modelId: string) => {
-    try {
-      const success = await setActiveModel(modelId);
-      if (success) {
-        setModels(prev => prev.map(model => ({
-          ...model,
-          active: model.id === modelId
-        })));
-        alert('Model set as active successfully!');
-      } else {
-        alert('Failed to set model as active. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error setting active model:', error);
-      alert('Error setting active model. Please try again.');
-    }
-  };
-
-  const handleDeleteModel = async (modelId: string) => {
-    if (!confirm('Are you sure you want to delete this model? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const success = await deleteModel(modelId);
-      if (success) {
-        setModels(prev => prev.map(model => 
-          model.id === modelId 
-            ? { ...model, downloaded: false, active: false }
-            : model
-        ));
-        alert('Model deleted successfully!');
-      } else {
-        alert('Failed to delete model. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error deleting model:', error);
-      alert('Error deleting model. Please try again.');
-    }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const totalDocuments = documents.length;
-  const totalSize = documents.reduce((sum, doc) => sum + doc.file_size, 0);
-  const totalChunks = documents.reduce((sum, doc) => sum + doc.num_chunks, 0);
+  const settingsSections = [
+    { id: 'prompt-management' as const, label: 'Prompt Management', icon: '📝' },
+    { id: 'query-transformation' as const, label: 'Query Transformation', icon: '🔄' },
+    { id: 'data' as const, label: 'Data', icon: '📊' },
+    { id: 'customize' as const, label: 'Customize', icon: '⚙️' },
+    { id: 'model-configuration' as const, label: 'Model Configuration', icon: '🤖' },
+    { id: 'information' as const, label: 'Information', icon: 'ℹ️' },
+  ];
 
   return (
-    <div style={{ height: '100%', overflow: 'auto', padding: '16px' }}>
-      {/* System Information */}
-      <div style={{ marginBottom: '24px' }}>
-        <h3 style={{ margin: '0 0 16px 0' }}>System Configuration</h3>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '16px'
-        }}>
-          <div style={{
-            padding: '16px',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            backgroundColor: '#f9fafb'
-          }}>
-            <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}>Backend Connection</h4>
-            <div style={{ fontSize: '14px', color: '#6b7280' }}>
-              <div><strong>URL:</strong> {systemInfo.backendUrl}</div>
-              <div style={{ marginTop: '4px' }}>
-                <span style={{
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  backgroundColor: '#10b981',
-                  color: 'white'
-                }}>
-                  ✓ Connected
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div style={{
-            padding: '16px',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            backgroundColor: '#f9fafb'
-          }}>
-            <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}>Models</h4>
-            <div style={{ fontSize: '14px', color: '#6b7280' }}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                  Select Model:
-                </label>
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: 'white',
-                    fontSize: '14px'
-                  }}
-                  disabled={modelLoading}
-                >
-                  <option value="">Select a model...</option>
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name} {model.active ? '(Active)' : ''} {model.downloaded ? '(Downloaded)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedModel && (
-                <div style={{ marginTop: '16px' }}>
-                  {(() => {
-                    const model = models.find(m => m.id === selectedModel);
-                    if (!model) return null;
-
-                    if (downloadingModels[selectedModel] !== undefined) {
-                      return (
-                        <div>
-                          <div style={{ marginBottom: '8px', color: '#059669' }}>
-                            Downloading... {Math.round(downloadingModels[selectedModel])}%
-                          </div>
-                          <div style={{
-                            width: '100%',
-                            height: '8px',
-                            backgroundColor: '#e5e7eb',
-                            borderRadius: '4px',
-                            overflow: 'hidden'
-                          }}>
-                            <div style={{
-                              width: `${downloadingModels[selectedModel]}%`,
-                              height: '100%',
-                              backgroundColor: '#10b981',
-                              transition: 'width 0.3s ease'
-                            }} />
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    if (!model.downloaded) {
-                      return (
-                        <button
-                          onClick={() => handleDownloadModel(model.id)}
-                          style={{
-                            padding: '8px 16px',
-                            backgroundColor: '#2563eb',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                          }}
-                        >
-                          Download
-                        </button>
-                      );
-                    }
-
-                    return (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        {!model.active && (
-                          <button
-                            onClick={() => handleSetActiveModel(model.id)}
-                            style={{
-                              padding: '8px 16px',
-                              backgroundColor: '#059669',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '14px'
-                            }}
-                          >
-                            Set Active
-                          </button>
-                        )}
-                        
-                        {model.active && (
-                          <span style={{
-                            padding: '8px 16px',
-                            backgroundColor: '#10b981',
-                            color: 'white',
-                            borderRadius: '6px',
-                            fontSize: '14px'
-                          }}>
-                            ✓ Active Model
-                          </span>
-                        )}
-                        
-                        <button
-                          onClick={() => handleDeleteModel(model.id)}
-                          style={{
-                            padding: '8px 16px',
-                            backgroundColor: '#dc2626',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div style={{
-            padding: '16px',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            backgroundColor: '#f9fafb'
-          }}>
-            <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}>Vector Database</h4>
-            <div style={{ fontSize: '14px', color: '#6b7280' }}>
-              <div><strong>Type:</strong> {systemInfo.vectorDatabase}</div>
-              <div><strong>Dimensions:</strong> {systemInfo.vectorDimensions}</div>
-            </div>
-          </div>
-
-          <div style={{
-            padding: '16px',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            backgroundColor: '#f9fafb'
-          }}>
-            <h4 style={{ margin: '0 0 12px 0', color: '#374151' }}>Text Processing</h4>
-            <div style={{ fontSize: '14px', color: '#6b7280' }}>
-              <div><strong>Chunk Size:</strong> {systemInfo.chunkSize} tokens</div>
-              <div><strong>Overlap:</strong> {systemInfo.chunkOverlap} tokens</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Document Statistics */}
-      <div style={{ marginBottom: '24px' }}>
-        <h3 style={{ margin: '0 0 16px 0' }}>Document Statistics</h3>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-          gap: '16px'
-        }}>
-          <div style={{
-            padding: '16px',
-            border: '1px solid #3b82f6',
-            borderRadius: '8px',
-            backgroundColor: '#eff6ff',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1d4ed8' }}>
-              {totalDocuments}
-            </div>
-            <div style={{ fontSize: '14px', color: '#3730a3' }}>Documents</div>
-          </div>
-
-          <div style={{
-            padding: '16px',
-            border: '1px solid #10b981',
-            borderRadius: '8px',
-            backgroundColor: '#f0fdf4',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#059669' }}>
-              {totalChunks}
-            </div>
-            <div style={{ fontSize: '14px', color: '#065f46' }}>Chunks</div>
-          </div>
-
-          <div style={{
-            padding: '16px',
-            border: '1px solid #f59e0b',
-            borderRadius: '8px',
-            backgroundColor: '#fffbeb',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#d97706' }}>
-              {formatFileSize(totalSize)}
-            </div>
-            <div style={{ fontSize: '14px', color: '#92400e' }}>Total Size</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Document Management */}
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{
+    <div style={{
+      display: 'flex',
+      height: '100%',
+      overflow: 'hidden',
+      fontFamily: theme.fonts.family,
+    }}>
+      {/* Settings Sidebar */}
+      <div style={{
+        width: '280px',
+        backgroundColor: theme.colors.white,
+        borderRight: `1px solid ${theme.colors.text.quaternary}`,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        position: 'relative',
+      }}>
+        {/* Scrollable content area */}
+        <div style={{ 
+          flex: 1,
+          overflowY: 'auto',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px'
+          flexDirection: 'column',
         }}>
-          <h3 style={{ margin: 0 }}>Document Management</h3>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ padding: '16px' }}>
+            {/* Logo with invisible spacer for alignment */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px',
+            }}>
+              <img 
+                src="/img/logo_aisc_bmftr.jpg" 
+                alt="Logo" 
+                style={{ 
+                  width: 'calc(100% - 40px)',
+                  height: 'auto',
+                  objectFit: 'contain',
+                }} 
+              />
+              <div style={{ width: '32px' }}></div>
+            </div>
+            
+            {settingsSections.map(section => (
             <button
-              onClick={loadDocuments}
-              disabled={loading}
+              key={section.id}
+              onClick={() => setActiveSection(section.id)}
               style={{
-                padding: '8px 16px',
-                backgroundColor: '#6b7280',
-                color: 'white',
-                border: 'none',
+                width: '100%',
+                padding: '12px 16px',
+                marginBottom: '8px',
+                backgroundColor: activeSection === section.id ? theme.colors.accent.quaternary : theme.colors.white,
+                border: `1px solid ${activeSection === section.id ? theme.colors.accent.primary : theme.colors.text.quaternary}`,
                 borderRadius: '6px',
-                cursor: loading ? 'not-allowed' : 'pointer'
+                cursor: 'pointer',
+                textAlign: 'left',
+                fontSize: '14px',
+                fontWeight: activeSection === section.id ? theme.fonts.weight.bold : theme.fonts.weight.regular,
+                color: activeSection === section.id ? theme.colors.accent.primary : theme.colors.text.primary,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (activeSection !== section.id) {
+                  e.currentTarget.style.backgroundColor = theme.colors.highlight.quaternary;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeSection !== section.id) {
+                  e.currentTarget.style.backgroundColor = theme.colors.white;
+                }
               }}
             >
-              {loading ? 'Loading...' : 'Refresh'}
+              <span style={{ fontSize: '18px' }}>{section.icon}</span>
+              <span>{section.label}</span>
             </button>
-            <button
-              onClick={handleSyncDocuments}
-              disabled={loading}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#2563eb',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: loading ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {loading ? 'Syncing...' : 'Sync All'}
-            </button>
+          ))}
           </div>
         </div>
 
-        {uploadProgress && (
+        {/* Fixed Bottom Section - Back to Chat Button */}
+        {onBackToChat && (
           <div style={{
-            padding: '12px',
-            marginBottom: '16px',
-            backgroundColor: uploadProgress.includes('failed') ? '#fef2f2' : '#f0f9ff',
-            border: `1px solid ${uploadProgress.includes('failed') ? '#fca5a5' : '#93c5fd'}`,
-            borderRadius: '6px',
-            color: uploadProgress.includes('failed') ? '#dc2626' : '#1d4ed8'
+            padding: '16px',
+            borderTop: `1px solid ${theme.colors.text.quaternary}`,
+            backgroundColor: theme.colors.white,
           }}>
-            {uploadProgress}
+            <button
+              onClick={onBackToChat}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: theme.colors.text.secondary,
+                color: theme.colors.white,
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: theme.fonts.weight.bold,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'background-color 0.2s ease',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.colors.text.primary}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.colors.text.secondary}
+            >
+              ⚙️ Back to Chat
+            </button>
           </div>
         )}
+      </div>
 
+      {/* Settings Main Content */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        width: '100%',
+      }}>
         <div style={{
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          overflow: 'hidden'
+          flex: 1,
+          padding: '24px',
+          overflowY: 'auto',
+          width: '100%',
+          maxWidth: '100%',
         }}>
-          {documents.length === 0 ? (
-            <div style={{
-              padding: '32px',
-              textAlign: 'center',
-              color: '#6b7280'
-            }}>
-              No documents uploaded yet. Go to the RAG Chat tab to upload documents.
-            </div>
-          ) : (
-            <div style={{ overflow: 'auto', maxHeight: '400px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead style={{ backgroundColor: '#f9fafb', position: 'sticky', top: 0 }}>
-                  <tr>
-                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-                      Filename
-                    </th>
-                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-                      Type
-                    </th>
-                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-                      Size
-                    </th>
-                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-                      Chunks
-                    </th>
-                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-                      Upload Date
-                    </th>
-                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {documents.map((doc) => (
-                    <tr key={doc.document_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '12px' }}>
-                        <div style={{ fontWeight: 'bold' }}>{doc.filename}</div>
-                        <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                          ID: {doc.document_id}
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px', color: '#6b7280' }}>
-                        {doc.file_type.toUpperCase()}
-                      </td>
-                      <td style={{ padding: '12px', color: '#6b7280' }}>
-                        {formatFileSize(doc.file_size)}
-                      </td>
-                      <td style={{ padding: '12px', color: '#6b7280' }}>
-                        {doc.num_chunks}
-                      </td>
-                      <td style={{ padding: '12px', color: '#6b7280' }}>
-                        {new Date(doc.upload_date).toLocaleString()}
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        <button
-                          onClick={() => handleDeleteDocument(doc.document_id, doc.filename)}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#dc2626',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px'
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {activeSection === 'prompt-management' && <PromptManagementSection prompts={prompts} setPrompts={setPrompts} />}
+          {activeSection === 'query-transformation' && <QueryTransformationSection />}
+          {activeSection === 'data' && <DataSection />}
+          {activeSection === 'customize' && <CustomizeSection />}
+          {activeSection === 'model-configuration' && <ModelConfigurationSection />}
+          {activeSection === 'information' && <InformationSection />}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Individual Settings Sections
+
+interface PromptManagementSectionProps {
+  prompts?: any[];
+  setPrompts?: (prompts: any[]) => void;
+}
+
+const PromptManagementSection: React.FC<PromptManagementSectionProps> = ({ prompts, setPrompts }) => {
+  return (
+    <div style={{ width: '100%' }}>
+      <h2 style={{ margin: '0 0 16px 0' }}>Prompt Management</h2>
+      <p style={{ color: theme.colors.text.secondary, marginBottom: '24px' }}>
+        Create and manage prompt templates for RAG queries. Set which prompt is active for chat responses.
+      </p>
+      {prompts && setPrompts ? (
+        <PromptManagement prompts={prompts} setPrompts={setPrompts} />
+      ) : (
+        <div style={{
+          padding: '24px',
+          backgroundColor: "transparent",
+          borderRadius: '8px',
+          textAlign: 'center',
+        }}>
+          <p>Prompt management will be integrated when connected to App state</p>
+        </div>
+      )}
+      <ResetButton section="Prompt Management" />
+    </div>
+  );
+};
+
+const QueryTransformationSection: React.FC = () => {
+  return (
+    <div style={{ width: '100%' }}>
+      <h2 style={{ margin: '0 0 16px 0' }}>Query Transformation</h2>
+      <div style={{
+        padding: '16px',
+        backgroundColor: '#fff3cd',
+        border: '1px solid #ffc107',
+        borderRadius: '8px',
+        marginBottom: '24px',
+      }}>
+        <p style={{ margin: 0, fontWeight: 'bold' }}>⚠️ Under Development</p>
+        <p style={{ margin: '8px 0 0 0', fontSize: '14px' }}>
+          Query transformation features are currently being developed and will be available in a future update.
+        </p>
+      </div>
+      <p style={{ color: theme.colors.text.secondary }}>
+        This section will allow you to configure how user queries are transformed and enhanced before being sent to the retrieval system.
+      </p>
+      <ResetButton section="Query Transformation" disabled />
+    </div>
+  );
+};
+
+const DataSection: React.FC = () => {
+  return (
+    <div style={{ width: '100%' }}>
+      <h2 style={{ margin: '0 0 16px 0' }}>Data Management</h2>
+      <p style={{ color: theme.colors.text.secondary, marginBottom: '24px' }}>
+        Upload new documents, delete existing documents, and view storage statistics.
+      </p>
+      <DocumentManagement />
+      <ResetButton section="Data" disabled />
+    </div>
+  );
+};
+
+const CustomizeSection: React.FC = () => {
+  const [maxTokens, setMaxTokens] = useState(300);
+  const [relevanceThreshold, setRelevanceThreshold] = useState(0.7);
+  const [topN, setTopN] = useState(5);
+  const [topK, setTopK] = useState(40);
+  const [temperature, setTemperature] = useState(0.3);
+  const [topP, setTopP] = useState(0.9);
+
+  const handleReset = () => {
+    setMaxTokens(300);
+    setRelevanceThreshold(0.7);
+    setTopN(5);
+    setTopK(40);
+    setTemperature(0.3);
+    setTopP(0.9);
+  };
+
+  return (
+    <div style={{ width: '100%' }}>
+      <h2 style={{ margin: '0 0 16px 0' }}>Customize Parameters</h2>
+      <p style={{ color: theme.colors.text.secondary, marginBottom: '24px' }}>
+        Adjust generation and retrieval parameters to customize system behavior.
+      </p>
+
+      <div style={{ display: 'grid', gap: '24px' }}>
+        {/* Max Tokens */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+            Max Tokens: {maxTokens}
+          </label>
+          <input
+            type="range"
+            min="50"
+            max="2000"
+            step="50"
+            value={maxTokens}
+            onChange={(e) => setMaxTokens(Number(e.target.value))}
+            style={{ width: '100%', accentColor: theme.colors.layout.primary }}
+          />
+          <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '4px 0 0 0' }}>
+            Maximum number of tokens in the generated response
+          </p>
+        </div>
+
+        {/* Relevance Threshold */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+            Relevance Threshold: {relevanceThreshold.toFixed(2)}
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={relevanceThreshold}
+            onChange={(e) => setRelevanceThreshold(Number(e.target.value))}
+            style={{ width: '100%', accentColor: theme.colors.layout.primary }}
+          />
+          <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '4px 0 0 0' }}>
+            Minimum similarity score for retrieved passages
+          </p>
+        </div>
+
+        {/* Top N Results */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+            Top N Results: {topN}
+          </label>
+          <input
+            type="range"
+            min="1"
+            max="20"
+            step="1"
+            value={topN}
+            onChange={(e) => setTopN(Number(e.target.value))}
+            style={{ width: '100%', accentColor: theme.colors.layout.primary }}
+          />
+          <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '4px 0 0 0' }}>
+            Number of passages to retrieve from the database
+          </p>
+        </div>
+
+        {/* Top-k */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+            Top-k Sampling: {topK}
+          </label>
+          <input
+            type="range"
+            min="1"
+            max="100"
+            step="1"
+            value={topK}
+            onChange={(e) => setTopK(Number(e.target.value))}
+            style={{ width: '100%', accentColor: theme.colors.layout.primary }}
+          />
+          <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '4px 0 0 0' }}>
+            Limits vocabulary to top-k most likely tokens during generation
+          </p>
+        </div>
+
+        {/* Temperature */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+            Temperature: {temperature.toFixed(2)}
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="2"
+            step="0.1"
+            value={temperature}
+            onChange={(e) => setTemperature(Number(e.target.value))}
+            style={{ width: '100%', accentColor: theme.colors.layout.primary }}
+          />
+          <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '4px 0 0 0' }}>
+            Controls randomness in responses (lower = more focused, higher = more creative)
+          </p>
+        </div>
+
+        {/* Top-p */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+            Top-p (Nucleus Sampling): {topP.toFixed(2)}
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={topP}
+            onChange={(e) => setTopP(Number(e.target.value))}
+            style={{ width: '100%', accentColor: theme.colors.layout.primary }}
+          />
+          <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '4px 0 0 0' }}>
+            Considers tokens with cumulative probability up to this value
+          </p>
         </div>
       </div>
 
-      {/* API Endpoints */}
-      <div>
-        <h3 style={{ margin: '0 0 16px 0' }}>API Endpoints</h3>
+      <ResetButton section="Customize" onReset={handleReset} />
+    </div>
+  );
+};
+
+const ModelConfigurationSection: React.FC = () => {
+  const [embeddingModel, setEmbeddingModel] = useState('sentence-transformers/all-MiniLM-L6-v2');
+  const [chunkSize, setChunkSize] = useState(512);
+  const [chunkOverlap, setChunkOverlap] = useState(128);
+
+  const handleReset = () => {
+    setEmbeddingModel('sentence-transformers/all-MiniLM-L6-v2');
+    setChunkSize(512);
+    setChunkOverlap(128);
+  };
+
+  return (
+    <div style={{ width: '100%' }}>
+      <h2 style={{ margin: '0 0 16px 0' }}>Model Configuration</h2>
+      <p style={{ color: theme.colors.text.secondary, marginBottom: '24px' }}>
+        Configure embedding models and document processing parameters.
+      </p>
+
+      <div style={{ display: 'grid', gap: '24px' }}>
+        {/* Embedding Model */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+            Embedding Model
+          </label>
+          <input
+            type="text"
+            value={embeddingModel}
+            onChange={(e) => setEmbeddingModel(e.target.value)}
+            placeholder="e.g., sentence-transformers/all-MiniLM-L6-v2"
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              border: `1px solid ${theme.colors.text.quaternary}`,
+              borderRadius: '6px',
+              fontSize: '14px',
+              boxSizing: 'border-box',
+            }}
+          />
+          <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '4px 0 0 0' }}>
+            HuggingFace model ID for text embeddings
+          </p>
+        </div>
+
+        {/* Chunk Size */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+            Chunk Size: {chunkSize} tokens
+          </label>
+          <input
+            type="range"
+            min="128"
+            max="2048"
+            step="128"
+            value={chunkSize}
+            onChange={(e) => setChunkSize(Number(e.target.value))}
+            style={{ width: '100%', accentColor: theme.colors.layout.primary }}
+          />
+          <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '4px 0 0 0' }}>
+            Maximum size of document chunks for embedding
+          </p>
+        </div>
+
+        {/* Chunk Overlap */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+            Chunk Overlap: {chunkOverlap} tokens
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="512"
+            step="32"
+            value={chunkOverlap}
+            onChange={(e) => setChunkOverlap(Number(e.target.value))}
+            style={{ width: '100%', accentColor: theme.colors.layout.primary }}
+          />
+          <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '4px 0 0 0' }}>
+            Number of overlapping tokens between consecutive chunks
+          </p>
+        </div>
+
+        {/* LLM Model Info */}
         <div style={{
           padding: '16px',
-          backgroundColor: '#f9fafb',
-          border: '1px solid #e5e7eb',
+          backgroundColor: "transparent",
           borderRadius: '8px',
-          fontFamily: 'monospace',
-          fontSize: '14px'
+          border: `1px solid ${theme.colors.text.quaternary}`,
         }}>
-          <div style={{ marginBottom: '8px' }}>
-            <strong>Documents:</strong> {systemInfo.backendUrl}/api/v1/documents/
-          </div>
-          <div style={{ marginBottom: '8px' }}>
-            <strong>Query:</strong> {systemInfo.backendUrl}/api/v1/query/
-          </div>
-          <div style={{ marginBottom: '8px' }}>
-            <strong>Chat:</strong> {systemInfo.backendUrl}/api/v1/chat/
-          </div>
-          <div>
-            <strong>Health:</strong> {systemInfo.backendUrl}/health
+          <h3 style={{ margin: '0 0 12px 0', fontSize: '16px' }}>Current LLM Model</h3>
+          <p style={{ margin: '0 0 8px 0', fontSize: '14px' }}>
+            Use the model selector in the top-right corner to switch LLM models.
+          </p>
+          <p style={{ margin: 0, fontSize: '12px', color: theme.colors.text.secondary }}>
+            The active model is used for generating chat responses.
+          </p>
+        </div>
+      </div>
+
+      <ResetButton section="Model Configuration" onReset={handleReset} />
+    </div>
+  );
+};
+
+const InformationSection: React.FC = () => {
+  const systemInfo = {
+    backendUrl: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+    embeddingModel: 'sentence-transformers/all-MiniLM-L6-v2',
+    vectorDatabase: 'Qdrant',
+    vectorDimensions: 384,
+    supportEmail: 'kisz@hpi.de',
+  };
+
+  return (
+    <div style={{ width: '100%' }}>
+      <h2 style={{ margin: '0 0 16px 0' }}>System Information</h2>
+      <p style={{ color: theme.colors.text.secondary, marginBottom: '24px' }}>
+        Technical details about the RAG system configuration and support contact.
+      </p>
+
+      <div style={{ display: 'grid', gap: '16px' }}>
+        {/* API Endpoint */}
+        <div style={{
+          padding: '16px',
+          backgroundColor: "transparent",
+          borderRadius: '8px',
+          border: `1px solid ${theme.colors.text.quaternary}`,
+        }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', color: theme.colors.text.secondary }}>API Endpoint</h3>
+          <p style={{ margin: 0, fontSize: '16px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+            {systemInfo.backendUrl}
+          </p>
+        </div>
+
+        {/* Vector Database */}
+        <div style={{
+          padding: '16px',
+          backgroundColor: "transparent",
+          borderRadius: '8px',
+          border: `1px solid ${theme.colors.text.quaternary}`,
+        }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', color: theme.colors.text.secondary }}>Vector Database</h3>
+          <p style={{ margin: 0, fontSize: '16px' }}>{systemInfo.vectorDatabase}</p>
+          <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: theme.colors.text.secondary }}>
+            Dimensions: {systemInfo.vectorDimensions}
+          </p>
+        </div>
+
+        {/* Embedding Model */}
+        <div style={{
+          padding: '16px',
+          backgroundColor: "transparent",
+          borderRadius: '8px',
+          border: `1px solid ${theme.colors.text.quaternary}`,
+        }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', color: theme.colors.text.secondary }}>Embedding Model</h3>
+          <p style={{ margin: 0, fontSize: '14px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+            {systemInfo.embeddingModel}
+          </p>
+        </div>
+
+        {/* Support Contact */}
+        <div style={{
+          padding: '16px',
+          backgroundColor: 'transparent',
+          borderRadius: '8px',
+          border: '1px solid #007bff',
+        }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', color: theme.colors.accent.primary }}>Support Contact</h3>
+          <p style={{ margin: 0, fontSize: '16px' }}>
+            <a href={`mailto:${systemInfo.supportEmail}`} style={{ color: theme.colors.accent.primary, textDecoration: 'none' }}>
+              {systemInfo.supportEmail}
+            </a>
+          </p>
+          <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: theme.colors.text.secondary }}>
+            For technical support and questions about the RAG system
+          </p>
+        </div>
+
+        {/* Backend Status */}
+        <div style={{
+          padding: '16px',
+          backgroundColor: "transparent",
+          borderRadius: '8px',
+          border: `1px solid ${theme.colors.text.quaternary}`,
+        }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', color: theme.colors.text.secondary }}>Backend Status</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ 
+              width: '12px', 
+              height: '12px', 
+              borderRadius: '50%', 
+              backgroundColor: '#059669',
+              display: 'inline-block'
+            }}></span>
+            <span style={{ fontSize: '16px', color: '#059669' }}>Connected</span>
           </div>
         </div>
       </div>
+
+      <ResetButton section="Information" disabled />
+    </div>
+  );
+};
+
+// Reset Button Component
+interface ResetButtonProps {
+  section: string;
+  onReset?: () => void;
+  disabled?: boolean;
+}
+
+const ResetButton: React.FC<ResetButtonProps> = ({ section, onReset, disabled = false }) => {
+  const handleReset = () => {
+    if (onReset) {
+      onReset();
+    } else {
+      alert(`Reset ${section} settings to defaults`);
+    }
+  };
+
+  return (
+    <div style={{
+      marginTop: '32px',
+      paddingTop: '24px',
+      borderTop: `1px solid ${theme.colors.text.quaternary}`,
+    }}>
+      <button
+        onClick={handleReset}
+        disabled={disabled}
+        style={{
+          padding: '10px 20px',
+          backgroundColor: disabled ? theme.colors.text.tertiary : theme.colors.accent.primary,
+          color: theme.colors.white,
+          border: 'none',
+          borderRadius: '6px',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          fontSize: '14px',
+          fontWeight: 'bold',
+        }}
+      >
+        🔄 Reset {section} Settings
+      </button>
+      {disabled && (
+        <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: theme.colors.text.secondary }}>
+          This section has no customizable settings to reset
+        </p>
+      )}
     </div>
   );
 };

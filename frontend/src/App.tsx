@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
 import DocumentUploadModal from './components/DocumentUploadModal';
 import RAGChat from './components/RAGChat';
-import PromptManagement from './components/PromptManagement';
 import RetrievedPassages from './components/RetrievedPassages';
 import LLMChat from './components/LLMChat';
-import QueryTransformations from './components/QueryTransformations';
 import Settings from './components/Settings';
-import { getPrompts, savePrompts } from './services/api';
+import Sidebar from './components/Sidebar';
+import MainWindow from './components/MainWindow';
+import ModelSelector from './components/ModelSelector';
+import { theme } from './theme';
+import { 
+  getPrompts, 
+  savePrompts,
+  createChatSession, 
+  listChatSessions, 
+  getChatHistory, 
+  deleteChatSession,
+  ChatSession 
+} from './services/api';
 import './index.css';
 
 export interface PromptTemplate {
@@ -65,8 +75,19 @@ interface LLMChatState {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState('rag-chat');
+  // View state
+  const [activeView, setActiveView] = useState<'chat' | 'settings'>('chat');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  
+  // Sidebar state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [chatHistoryEnabled, setChatHistoryEnabled] = useState(true);
+  const [ragEnabled, setRagEnabled] = useState(true);
+  const [retrievalModeEnabled, setRetrievalModeEnabled] = useState(false);
+  
+  // Chat session state
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   
   // Shared prompt state
   const [prompts, setPrompts] = useState<PromptTemplate[]>([
@@ -169,7 +190,10 @@ Answer:`,
     loadPrompts();
   }, []);
 
-  // Save prompts to backend when they change
+  // Get active prompt for RAG queries
+  const activePrompt = prompts.find(p => p.isActive);
+
+  // Handle prompt updates
   const handlePromptsChange = async (newPrompts: PromptTemplate[]) => {
     setPrompts(newPrompts);
     try {
@@ -179,256 +203,269 @@ Answer:`,
     }
   };
 
-  // Get active prompt for RAG queries
-  const activePrompt = prompts.find(p => p.isActive);
+  // Load chat sessions
+  useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        const sessions = await listChatSessions();
+        setChatSessions(sessions);
+        
+        // Only create initial session if there are no sessions at all and no current session
+        if (!currentSessionId && sessions.length === 0) {
+          const newSessionId = await createChatSession();
+          setCurrentSessionId(newSessionId);
+        }
+      } catch (error) {
+        console.warn('Failed to load chat sessions', error);
+      }
+    };
+    if (chatHistoryEnabled) {
+      loadSessions();
+    }
+  }, [chatHistoryEnabled, currentSessionId]);
 
-  const tabs = [
-    { id: 'rag-chat', label: 'RAG Chat' },
-    { id: 'prompt-management', label: 'Prompt Management' },
-    { id: 'retrieved-passages', label: 'Retrieved Passages' },
-    { id: 'llm-chat', label: 'LLM Chat' },
-    { id: 'query-transformations', label: 'Query Transformations' },
-    { id: 'settings', label: 'Settings' },
-  ];
+  // Sidebar handlers
+  const handleNewChat = async () => {
+    if (chatHistoryEnabled) {
+      // Check if we have any messages in the current chat
+      const hasMessages = ragEnabled ? ragChatState.messages.length > 0 : llmChatState.messages.length > 0;
+      
+      if (hasMessages) {
+        // If we have messages but no session, create one first to save current chat
+        if (!currentSessionId) {
+          try {
+            const newSessionId = await createChatSession();
+            setCurrentSessionId(newSessionId);
+            // Note: Messages are automatically saved during queries via backend
+            // Reload sessions list to show the new session
+            const sessions = await listChatSessions();
+            setChatSessions(sessions);
+          } catch (error) {
+            console.error('Error creating session for current chat:', error);
+          }
+        }
+      }
+      
+      // Now create a new session for the new chat
+      try {
+        const newSessionId = await createChatSession();
+        setCurrentSessionId(newSessionId);
+        // Reload sessions list
+        const sessions = await listChatSessions();
+        setChatSessions(sessions);
+        // Clear current chat
+        setRagChatState(prev => ({
+          ...prev,
+          messages: [],
+          currentAnswer: '',
+          currentChunks: [],
+        }));
+        setLlmChatState(prev => ({
+          ...prev,
+          messages: [],
+          currentAnswer: '',
+        }));
+      } catch (error) {
+        console.error('Error creating new chat:', error);
+      }
+    } else {
+      // Just clear current chat if history is disabled
+      setRagChatState(prev => ({
+        ...prev,
+        messages: [],
+        currentAnswer: '',
+        currentChunks: [],
+      }));
+      setLlmChatState(prev => ({
+        ...prev,
+        messages: [],
+        currentAnswer: '',
+      }));
+    }
+  };
+
+  const handleSelectSession = async (sessionId: string) => {
+    try {
+      const history = await getChatHistory(sessionId);
+      setCurrentSessionId(sessionId);
+      
+      // Build message list from history
+      // If a message has versions, only show it (not the messages after it)
+      // The messages after it are stored in messagesPerVersion and shown via navigation
+      const messages: any[] = [];
+      
+      for (let i = 0; i < history.length; i++) {
+        const msg = history[i];
+        
+        // Add user query
+        messages.push({
+          id: `${msg.timestamp}-user`,
+          type: 'user' as const,
+          content: msg.query,
+          timestamp: new Date(msg.timestamp),
+        });
+        
+        // Add assistant response
+        const assistantMsg: any = {
+          id: `${msg.timestamp}-assistant`,
+          type: 'assistant' as const,
+          content: msg.answer,
+          chunks: msg.chunks,
+          timestamp: new Date(msg.timestamp),
+        };
+        
+        // Restore version information if it exists
+        if (msg.versions) {
+          assistantMsg.versions = msg.versions;
+          assistantMsg.versionsChunks = msg.versions_chunks || [];
+          assistantMsg.currentVersionIndex = msg.versions.length - 1; // Default to latest version
+          
+          // Convert message snapshots from plain objects back to Message format
+          if (msg.messages_per_version) {
+            assistantMsg.messagesPerVersion = msg.messages_per_version.map(
+              (versionMessages: any[]) => versionMessages.map((snapMsg: any) => {
+                const msgType = snapMsg.query ? 'user' : 'assistant';
+                return {
+                  id: snapMsg.timestamp ? `${snapMsg.timestamp}-${msgType}` : `snap-${Math.random()}`,
+                  type: msgType as 'user' | 'assistant',
+                  content: snapMsg.query || snapMsg.answer || '',
+                  chunks: snapMsg.chunks || [],
+                  timestamp: new Date(snapMsg.timestamp || Date.now()),
+                };
+              })
+            );
+          } else {
+            assistantMsg.messagesPerVersion = [];
+          }
+          
+          // For the latest version, add the messages from the snapshot
+          const latestVersionIndex = msg.versions.length - 1;
+          const messagesForLatestVersion = assistantMsg.messagesPerVersion[latestVersionIndex] || [];
+          messages.push(assistantMsg);
+          messages.push(...messagesForLatestVersion);
+          
+          // Skip the rest since this message controls what comes after
+          break;
+        } else {
+          messages.push(assistantMsg);
+        }
+      }
+
+      if (ragEnabled) {
+        setRagChatState(prev => ({
+          ...prev,
+          messages,
+          currentAnswer: '',
+          currentChunks: [],
+        }));
+      } else {
+        setLlmChatState(prev => ({
+          ...prev,
+          messages,
+          currentAnswer: '',
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      await deleteChatSession(sessionId);
+      setChatSessions(prev => prev.filter(s => s.session_id !== sessionId));
+      if (currentSessionId === sessionId) {
+        setCurrentSessionId(null);
+        handleNewChat();
+      }
+    } catch (error) {
+      console.error('Error deleting chat session:', error);
+    }
+  };
+
+  // Callback to refresh sessions list (called after sending messages)
+  const refreshSessions = async () => {
+    if (chatHistoryEnabled) {
+      try {
+        const sessions = await listChatSessions();
+        setChatSessions(sessions);
+      } catch (error) {
+        console.warn('Failed to refresh chat sessions');
+      }
+    }
+  };
 
   return (
     <div style={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      flexDirection: 'column',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      backgroundColor: '#ffffff',
-      color: '#333333'
+      display: 'flex',
+      height: '100vh',
+      fontFamily: theme.fonts.family,
+      backgroundColor: theme.colors.white,
+      color: theme.colors.text.primary,
+      overflow: 'hidden',
     }}>
-      {/* Tab Navigation */}
-      <div style={{
-        display: 'flex',
-        backgroundColor: '#f8f9fa',
-        borderBottom: '1px solid #dee2e6',
-        padding: '0 16px',
-        overflowX: 'auto'
-      }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '12px 16px',
-              border: 'none',
-              backgroundColor: 'transparent',
-              color: activeTab === tab.id ? '#007bff' : '#666666',
-              fontSize: '14px',
-              fontWeight: activeTab === tab.id ? 'bold' : 'normal',
-              cursor: 'pointer',
-              borderBottom: activeTab === tab.id ? '2px solid #007bff' : '2px solid transparent',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {activeView === 'settings' ? (
+        // Settings View with its own sidebar
+        <Settings 
+          onBackToChat={() => setActiveView('chat')}
+          prompts={prompts}
+          setPrompts={handlePromptsChange}
+        />
+      ) : (
+        <>
+          {/* Sidebar */}
+          <Sidebar
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            onNewChat={handleNewChat}
+            onSettingsClick={() => setActiveView('settings')}
+            chatHistoryEnabled={chatHistoryEnabled}
+            onChatHistoryToggle={setChatHistoryEnabled}
+            ragEnabled={ragEnabled}
+            onRagToggle={setRagEnabled}
+            retrievalModeEnabled={retrievalModeEnabled}
+            onRetrievalModeToggle={setRetrievalModeEnabled}
+            chatSessions={chatSessions}
+            currentSessionId={currentSessionId}
+            onSelectSession={handleSelectSession}
+            onDeleteSession={handleDeleteSession}
+          />
 
-      {/* Tab Content */}
-      <div style={{ 
-        flex: 1, 
-        padding: '24px',
-        backgroundColor: '#ffffff',
-        paddingBottom: '24px'
-      }}>
-        {activeTab === 'rag-chat' && (
-          <div>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ margin: '0 0 8px 0' }}>RAG Chat</h2>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
-                  Chat with your documents using retrieval-augmented generation. Upload documents first if you haven't already.
-                </p>
-                <button
-                  onClick={() => setRagChatState(prev => ({ 
-                    ...prev, 
-                    messages: [], 
-                    currentAnswer: '', 
-                    isStreaming: false 
-                  }))}
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: '#dc2626',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  Clear History
-                </button>
-              </div>
-            </div>
-            <div>
-              <RAGChat 
-                activePrompt={activePrompt} 
+          {/* Main Window */}
+          <MainWindow
+            headerContent={
+              !retrievalModeEnabled ? (
+                <ModelSelector onModelChange={(modelId) => console.log('Model changed:', modelId)} />
+              ) : null
+            }
+          >
+            {retrievalModeEnabled ? (
+              // Retrieval Mode View
+              <RetrievedPassages 
+                ragChatState={ragChatState}
+                setRagChatState={setRagChatState}
+              />
+            ) : ragEnabled ? (
+              // RAG Chat View
+              <RAGChat
+                activePrompt={activePrompt}
                 chatState={ragChatState}
                 setChatState={setRagChatState}
+                currentSessionId={currentSessionId}
+                onMessageSent={refreshSessions}
               />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'prompt-management' && (
-          <div>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ margin: '0 0 8px 0' }}>Prompt Management</h2>
-              <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
-                Create and manage prompt templates for RAG queries. Edit templates and set which one is active for chat responses.
-              </p>
-            </div>
-            <div>
-              <PromptManagement prompts={prompts} setPrompts={handlePromptsChange} />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'retrieved-passages' && (
-          <div>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ margin: '0 0 8px 0' }}>Retrieved Passages</h2>
-              <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
-                Search and examine document passages retrieved by the vector database.
-              </p>
-            </div>
-            <div>
-              <RetrievedPassages />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'llm-chat' && (
-          <div>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ margin: '0 0 8px 0' }}>LLM Chat</h2>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
-                  Direct chat with the language model without document retrieval.
-                </p>
-                <button
-                  onClick={() => setLlmChatState(prev => ({ 
-                    ...prev, 
-                    messages: [], 
-                    currentAnswer: '', 
-                    isStreaming: false 
-                  }))}
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: '#dc2626',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  Clear History
-                </button>
-              </div>
-            </div>
-            <div>
-              <LLMChat 
+            ) : (
+              // LLM Chat View (RAG disabled)
+              <LLMChat
                 chatState={llmChatState}
                 setChatState={setLlmChatState}
+                currentSessionId={currentSessionId}
+                onMessageSent={refreshSessions}
               />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'query-transformations' && (
-          <div>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ margin: '0 0 8px 0' }}>Query Transformations</h2>
-              <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
-                Analyze and transform user queries before processing them through the RAG pipeline.
-              </p>
-            </div>
-            <div>
-              <QueryTransformations />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'settings' && (
-          <div>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ margin: '0 0 8px 0' }}>Settings</h2>
-              <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
-                Configure the RAG system settings and preferences.
-              </p>
-            </div>
-            <div>
-              <Settings />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Floating Upload Button */}
-      <button
-        onClick={() => setIsUploadModalOpen(true)}
-        style={{
-          position: 'fixed',
-          bottom: '84px',
-          right: '24px',
-          width: '60px',
-          height: '60px',
-          borderRadius: '50%',
-          backgroundColor: '#007bff',
-          color: 'white',
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: '18px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          zIndex: 999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.2s ease',
-          fontWeight: 'bold'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = '#0056b3';
-          e.currentTarget.style.transform = 'scale(1.1)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = '#007bff';
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
-        title="Upload Documents"
-      >
-        +
-      </button>
-
-      {/* Banner at bottom */}
-      <div style={{
-        padding: '24px 48px',
-        backgroundColor: '#f8f9fa',
-        borderTop: '1px solid #dee2e6',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center'
-      }}>
-        <img 
-          src="/img/logo_aisc_bmftr.jpg" 
-          alt="AI Service Center Banner"
-          style={{
-            maxHeight: '120px',
-            height: 'auto',
-            objectFit: 'contain'
-          }}
-        />
-      </div>
+            )}
+          </MainWindow>
+        </>
+      )}
 
       {/* Upload Modal */}
       <DocumentUploadModal

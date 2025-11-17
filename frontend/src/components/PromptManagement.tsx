@@ -1,3 +1,4 @@
+import { theme } from '../theme';
 import React, { useState, useEffect } from 'react';
 
 export interface PromptTemplate {
@@ -116,7 +117,7 @@ Answer:`,
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', gap: '16px' }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', gap: '16px' }}>
       {/* Left Panel - Prompt List */}
       <div style={{ width: '300px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ 
@@ -130,8 +131,8 @@ Answer:`,
             onClick={handleCreateNew}
             style={{
               padding: '8px 12px',
-              backgroundColor: '#2563eb',
-              color: 'white',
+              backgroundColor: theme.colors.accent.primary,
+              color: theme.colors.white,
               border: 'none',
               borderRadius: '6px',
               cursor: 'pointer',
@@ -154,7 +155,7 @@ Answer:`,
                 padding: '12px',
                 borderBottom: '1px solid #eee',
                 cursor: 'pointer',
-                backgroundColor: selectedPrompt?.id === prompt.id ? '#eff6ff' : 'white'
+                backgroundColor: selectedPrompt?.id === prompt.id ? 'theme.colors.accent.quaternary' : theme.colors.white
               }}
               onClick={() => {
                 setSelectedPrompt(prompt);
@@ -173,15 +174,15 @@ Answer:`,
               }}>
                 <span style={{ 
                   fontWeight: 'bold',
-                  color: prompt.isActive ? '#059669' : '#374151'
+                  color: prompt.isActive ? theme.colors.layout.primary : '#374151'
                 }}>
                   {prompt.name}
-                  {prompt.isActive && <span style={{ color: '#059669' }}> ✓</span>}
+                  {prompt.isActive && <span style={{ color: theme.colors.layout.primary }}> ✓</span>}
                 </span>
               </div>
               <div style={{ 
                 fontSize: '12px', 
-                color: '#666',
+                color: 'theme.colors.text.secondary',
                 marginBottom: '8px'
               }}>
                 {prompt.description}
@@ -196,8 +197,8 @@ Answer:`,
                     style={{
                       padding: '4px 8px',
                       fontSize: '12px',
-                      backgroundColor: '#059669',
-                      color: 'white',
+                      backgroundColor: theme.colors.layout.primary,
+                      color: theme.colors.white,
                       border: 'none',
                       borderRadius: '4px',
                       cursor: 'pointer'
@@ -216,8 +217,8 @@ Answer:`,
                   style={{
                     padding: '4px 8px',
                     fontSize: '12px',
-                    backgroundColor: '#dc2626',
-                    color: 'white',
+                    backgroundColor: theme.colors.accent.primary,
+                    color: theme.colors.white,
                     border: 'none',
                     borderRadius: '4px',
                     cursor: 'pointer'
@@ -249,8 +250,8 @@ Answer:`,
                   onClick={handleSavePrompt}
                   style={{
                     padding: '8px 16px',
-                    backgroundColor: '#059669',
-                    color: 'white',
+                    backgroundColor: theme.colors.layout.primary,
+                    color: theme.colors.white,
                     border: 'none',
                     borderRadius: '6px',
                     cursor: 'pointer'
@@ -276,10 +277,10 @@ Answer:`,
                       style={{
                         width: '100%',
                         padding: '8px',
-                        border: '1px solid #dee2e6',
+                        border: '1px solid theme.colors.text.quaternary',
                         borderRadius: '6px',
-                        backgroundColor: '#ffffff',
-                        color: '#333333',
+                        backgroundColor: theme.colors.white,
+                        color: 'theme.colors.text.primary',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -295,10 +296,10 @@ Answer:`,
                       style={{
                         width: '100%',
                         padding: '8px',
-                        border: '1px solid #dee2e6',
+                        border: '1px solid theme.colors.text.quaternary',
                         borderRadius: '6px',
-                        backgroundColor: '#ffffff',
-                        color: '#333333',
+                        backgroundColor: theme.colors.white,
+                        color: 'theme.colors.text.primary',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -306,8 +307,18 @@ Answer:`,
                 </div>
 
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: 'bold' }}>
                     Prompt Template:
+                    <span 
+                      style={{ 
+                        cursor: 'help',
+                        fontSize: '16px',
+                        color: theme.colors.text.secondary,
+                      }}
+                      title={`Available placeholders:\n{context} - Retrieved document passages\n{history} - Conversation history\n{query} or {question} - User's question`}
+                    >
+                      ❓
+                    </span>
                   </label>
                   <textarea
                     value={editForm.template}
@@ -316,13 +327,13 @@ Answer:`,
                       width: '100%',
                       height: '400px',
                       padding: '12px',
-                      border: '1px solid #dee2e6',
+                      border: '1px solid theme.colors.text.quaternary',
                       borderRadius: '6px',
                       fontFamily: 'monospace',
                       fontSize: '14px',
                       resize: 'none',
-                      backgroundColor: '#ffffff',
-                      color: '#333333',
+                      backgroundColor: theme.colors.white,
+                      color: 'theme.colors.text.primary',
                       lineHeight: '1.5',
                       boxSizing: 'border-box',
                       overflow: 'auto'
@@ -332,32 +343,7 @@ Answer:`,
                 </div>
               </div>
 
-              {/* Right side - Placeholder info */}
-              <div style={{ 
-                width: '250px',
-                padding: '12px',
-                backgroundColor: '#f8f9fa',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px',
-                alignSelf: 'stretch',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center'
-              }}>
-                <strong style={{ marginBottom: '8px', display: 'block' }}>Available placeholders:</strong>
-                <div style={{ lineHeight: '1.6' }}>
-                  <div style={{ marginBottom: '4px' }}>
-                    <code style={{ backgroundColor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>{'{context}'}</code> - Retrieved document passages
-                  </div>
-                  <div style={{ marginBottom: '4px' }}>
-                    <code style={{ backgroundColor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>{'{history}'}</code> - Conversation history
-                  </div>
-                  <div>
-                    <code style={{ backgroundColor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>{'{query}'}</code> or <code style={{ backgroundColor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>{'{question}'}</code> - User's question
-                  </div>
-                </div>
-              </div>
+              {/* Removed placeholder info panel */}
             </div>
           </>
         ) : (

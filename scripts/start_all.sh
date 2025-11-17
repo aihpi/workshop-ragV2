@@ -12,13 +12,31 @@ if [ ! -d "backend/.venv" ]; then
     exit 1
 fi
 
-# Check if model exists
-if [ ! -d "models/Llama-3.2-3B-Instruct" ]; then
+# Check if model exists (check for Qwen model first, then Llama)
+if [ ! -d "models/Qwen2.5-3B-Instruct" ] && [ ! -d "models/Qwen2.5-0.5B-Instruct" ] && [ ! -d "models/Llama-3.2-3B-Instruct" ]; then
     echo "Warning: Model not found. Run ./scripts/download_model.sh"
     read -p "Continue anyway? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit 1
+    fi
+fi
+
+# Check if services are already running
+if tmux has-session -t rag-tool 2>/dev/null; then
+    echo "Services are already running in tmux session 'rag-tool'"
+    echo ""
+    echo "Options:"
+    echo "  1. Attach to existing session: tmux attach -t rag-tool"
+    echo "  2. Stop and restart: ./scripts/stop_all.sh && ./scripts/start_all.sh"
+    echo ""
+    read -p "Restart services? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        ./scripts/stop_all.sh
+        sleep 2
+    else
+        exit 0
     fi
 fi
 

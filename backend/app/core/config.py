@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # LLM Settings
     VLLM_HOST: str = "localhost"
     VLLM_PORT: int = 8001
-    LLM_MODEL: str = "Qwen/Qwen2.5-0.5B-Instruct"
+    LLM_MODEL: str = "./models/Llama-3.2-3B-Instruct"
     LLM_MAX_TOKENS: int = 512
     LLM_TEMPERATURE: float = 0.7
     LLM_TOP_P: float = 0.9

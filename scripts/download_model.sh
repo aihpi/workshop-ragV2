@@ -1,20 +1,24 @@
 #!/bin/bash
-# Download and setup Qwen 2.5 0.5B model (open source alternative)
+# Download and setup Llama 3.2 3B model (default model)
 
 set -e
 
-echo "===== Qwen 2.5 0.5B Model Download ====="
+echo "===== Llama 3.2 3B Model Download ====="
 echo ""
-echo "This script will download the Qwen 2.5 0.5B Instruct model."
-echo "Model size: ~1.2 GB (smaller, open source alternative)"
+echo "This script will download the Llama 3.2 3B Instruct model."
+echo "Model size: ~6 GB"
 echo ""
 
-# Create models directory
-MODELS_DIR="../models"
+# Get the script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Create models directory in project root
+MODELS_DIR="$PROJECT_ROOT/models"
 mkdir -p "$MODELS_DIR"
 
 # Check if model already exists
-MODEL_PATH="$MODELS_DIR/Qwen2.5-0.5B-Instruct"
+MODEL_PATH="$MODELS_DIR/Llama-3.2-3B-Instruct"
 
 if [ -d "$MODEL_PATH" ]; then
     echo "✓ Model already exists at $MODEL_PATH"
@@ -39,7 +43,7 @@ fi
 
 # Download model
 echo "Starting download..."
-huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct \
+huggingface-cli download meta-llama/Llama-3.2-3B-Instruct \
     --local-dir "$MODEL_PATH" \
     --local-dir-use-symlinks False
 

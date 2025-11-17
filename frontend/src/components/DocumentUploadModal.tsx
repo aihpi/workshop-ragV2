@@ -1,3 +1,4 @@
+import { theme } from '../theme';
 import React, { useState, useEffect } from 'react';
 import { uploadDocument, listDocuments, deleteDocument, syncDocuments, Document } from '../services/api';
 
@@ -145,7 +146,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          backgroundColor: '#ffffff',
+          backgroundColor: 'theme.colors.white',
           borderRadius: '12px',
           padding: '24px',
           width: '90%',
@@ -153,8 +154,8 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
           maxHeight: '80vh',
           overflow: 'auto',
           zIndex: 1001,
-          color: '#333333',
-          border: '1px solid #dee2e6',
+          color: 'theme.colors.text.primary',
+          border: '1px solid theme.colors.text.quaternary',
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
         }}
       >
@@ -165,13 +166,13 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
           alignItems: 'center',
           marginBottom: '24px'
         }}>
-          <h2 style={{ margin: 0, color: '#333333' }}>Document Management</h2>
+          <h2 style={{ margin: 0, color: 'theme.colors.text.primary' }}>Document Management</h2>
           <button
             onClick={onClose}
             style={{
               backgroundColor: 'transparent',
               border: 'none',
-              color: '#666666',
+              color: 'theme.colors.text.secondary666',
               fontSize: '24px',
               cursor: 'pointer',
               padding: '4px'
@@ -197,22 +198,22 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
 
         {/* Upload Section */}
         <div style={{
-          border: '1px solid #dee2e6',
+          border: '1px solid theme.colors.text.quaternary',
           borderRadius: '8px',
           padding: '20px',
           marginBottom: '24px',
-          backgroundColor: '#f8f9fa'
+          backgroundColor: 'theme.colors.highlight.quaternary'
         }}>
-          <h3 style={{ margin: '0 0 16px 0', color: '#333333' }}>Upload Document</h3>
+          <h3 style={{ margin: '0 0 16px 0', color: 'theme.colors.text.primary' }}>Upload Document</h3>
           
           {/* Drag & Drop Area */}
           <div
             style={{
-              border: `2px dashed ${dragOver ? '#007bff' : '#adb5bd'}`,
+              border: `2px dashed ${dragOver ? 'theme.colors.accent.primary' : '#adb5bd'}`,
               borderRadius: '8px',
               padding: '32px',
               textAlign: 'center',
-              backgroundColor: dragOver ? '#e3f2fd' : '#ffffff',
+              backgroundColor: dragOver ? '#e3f2fd' : 'theme.colors.white',
               transition: 'all 0.2s ease',
               marginBottom: '16px'
             }}
@@ -221,10 +222,10 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
             onDrop={handleDrop}
           >
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>+</div>
-            <p style={{ margin: '0 0 8px 0', color: '#333333' }}>
+            <p style={{ margin: '0 0 8px 0', color: 'theme.colors.text.primary' }}>
               {selectedFile ? selectedFile.name : 'Drag & drop a file here, or click to select'}
             </p>
-            <p style={{ margin: 0, color: '#666666', fontSize: '14px' }}>
+            <p style={{ margin: 0, color: 'theme.colors.text.secondary666', fontSize: '14px' }}>
               Supported: PDF, DOCX, TXT, MD, HTML, XML
             </p>
             <input
@@ -241,7 +242,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
                 marginTop: '12px',
                 padding: '8px 16px',
                 backgroundColor: '#6c757d',
-                color: '#ffffff',
+                color: 'theme.colors.white',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 border: 'none'
@@ -257,8 +258,8 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
               disabled={!selectedFile || loading}
               style={{
                 padding: '12px 24px',
-                backgroundColor: selectedFile && !loading ? '#007bff' : '#6c757d',
-                color: 'white',
+                backgroundColor: selectedFile && !loading ? 'theme.colors.accent.primary' : '#6c757d',
+                color: theme.colors.white,
                 border: 'none',
                 borderRadius: '6px',
                 cursor: selectedFile && !loading ? 'pointer' : 'not-allowed',
@@ -273,7 +274,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
               style={{
                 padding: '12px 24px',
                 backgroundColor: loading ? '#6c757d' : '#28a745',
-                color: 'white',
+                color: theme.colors.white,
                 border: 'none',
                 borderRadius: '6px',
                 cursor: loading ? 'not-allowed' : 'pointer'
@@ -286,18 +287,18 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
 
         {/* Documents List */}
         <div style={{
-          border: '1px solid #dee2e6',
+          border: '1px solid theme.colors.text.quaternary',
           borderRadius: '8px',
-          backgroundColor: '#f8f9fa'
+          backgroundColor: 'theme.colors.highlight.quaternary'
         }}>
           <div style={{ 
             padding: '16px',
-            borderBottom: '1px solid #dee2e6',
+            borderBottom: '1px solid theme.colors.text.quaternary',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            <h3 style={{ margin: 0, color: '#333333' }}>
+            <h3 style={{ margin: 0, color: 'theme.colors.text.primary' }}>
               Documents ({documents.length})
             </h3>
             <button
@@ -306,7 +307,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
               style={{
                 padding: '6px 12px',
                 backgroundColor: '#6c757d',
-                color: 'white',
+                color: theme.colors.white,
                 border: 'none',
                 borderRadius: '4px',
                 cursor: loading ? 'not-allowed' : 'pointer',
@@ -322,7 +323,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
               <div style={{ 
                 padding: '32px', 
                 textAlign: 'center', 
-                color: '#666666' 
+                color: 'theme.colors.text.secondary666' 
               }}>
                 No documents uploaded yet
               </div>
@@ -332,19 +333,19 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
                   key={doc.document_id}
                   style={{
                     padding: '16px',
-                    borderBottom: '1px solid #dee2e6',
+                    borderBottom: '1px solid theme.colors.text.quaternary',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center'
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <h4 style={{ margin: '0 0 4px 0', color: '#333333' }}>
+                    <h4 style={{ margin: '0 0 4px 0', color: 'theme.colors.text.primary' }}>
                       {doc.filename}
                     </h4>
                     <p style={{ 
                       margin: 0, 
-                      color: '#666666', 
+                      color: 'theme.colors.text.secondary666', 
                       fontSize: '14px' 
                     }}>
                       {doc.file_type.toUpperCase()} • {formatFileSize(doc.file_size)} • {doc.num_chunks} chunks • {new Date(doc.upload_date).toLocaleString()}
@@ -354,8 +355,8 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({ isOpen, onClo
                     onClick={() => handleDelete(doc.document_id)}
                     style={{
                       padding: '6px 12px',
-                      backgroundColor: '#dc2626',
-                      color: 'white',
+                      backgroundColor: 'theme.colors.accent.primary',
+                      color: theme.colors.white,
                       border: 'none',
                       borderRadius: '4px',
                       cursor: 'pointer',

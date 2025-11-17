@@ -16,14 +16,21 @@ else
 fi
 
 # Kill any remaining processes
+echo "Stopping backend processes..."
 pkill -f "uvicorn app.main:app" || true
+echo "Stopping vLLM processes..."
 pkill -f "vllm.entrypoints.openai.api_server" || true
-pkill -f "qdrant" || true
 
 # Stop Docker containers if running
 if command -v docker &> /dev/null; then
-    docker stop qdrant 2>/dev/null || true
-    docker rm qdrant 2>/dev/null || true
+    # Stop Qdrant (note: we don't remove it to preserve data)
+    if docker ps -q -f name=^qdrant$ &>/dev/null; then
+        echo "Stopping Qdrant container..."
+        docker stop qdrant 2>/dev/null || true
+        echo "✓ Qdrant stopped (container preserved for data persistence)"
+    fi
 fi
 
 echo "✓ All services stopped"
+echo ""
+echo "To start services again, run: ./scripts/start_all.sh"

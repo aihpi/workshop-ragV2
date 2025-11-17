@@ -39,7 +39,10 @@ class ChatHistoryManager:
         
         return session_id
     
-    def add_message(self, session_id: str, query: str, answer: str, chunks: List[Dict]):
+    def add_message(self, session_id: str, query: str, answer: str, chunks: List[Dict], 
+                    versions: Optional[List[str]] = None, 
+                    versions_chunks: Optional[List[List[Dict]]] = None,
+                    messages_per_version: Optional[List[List[Dict]]] = None):
         """Add a message to chat history.
         
         Args:
@@ -47,6 +50,9 @@ class ChatHistoryManager:
             query: User query
             answer: Assistant answer
             chunks: Retrieved chunks
+            versions: List of response versions (optional)
+            versions_chunks: Chunks for each version (optional)
+            messages_per_version: Complete message list after each version (optional)
         """
         session_file = self.history_folder / f"{session_id}.json"
         
@@ -63,7 +69,49 @@ class ChatHistoryManager:
             "chunks": chunks,
         }
         
+        # Add version information if provided
+        if versions is not None:
+            message["versions"] = versions
+        if versions_chunks is not None:
+            message["versions_chunks"] = versions_chunks
+        if messages_per_version is not None:
+            message["messages_per_version"] = messages_per_version
+        
         session_data["messages"].append(message)
+        
+        with open(session_file, "w") as f:
+            json.dump(session_data, f, indent=2)
+    
+    def update_message(self, session_id: str, message_index: int, 
+                      versions: Optional[List[str]] = None,
+                      versions_chunks: Optional[List[List[Dict]]] = None,
+                      messages_per_version: Optional[List[List[Dict]]] = None):
+        """Update a message with version information.
+        
+        Args:
+            session_id: Chat session ID
+            message_index: Index of the message to update (0-based)
+            versions: List of response versions
+            versions_chunks: Chunks for each version
+            messages_per_version: Complete message list after each version
+        """
+        session_file = self.history_folder / f"{session_id}.json"
+        
+        if not session_file.exists():
+            raise ValueError(f"Session {session_id} not found")
+        
+        with open(session_file, "r") as f:
+            session_data = json.load(f)
+        
+        if message_index >= len(session_data["messages"]):
+            raise ValueError(f"Message index {message_index} out of range")
+        
+        if versions is not None:
+            session_data["messages"][message_index]["versions"] = versions
+        if versions_chunks is not None:
+            session_data["messages"][message_index]["versions_chunks"] = versions_chunks
+        if messages_per_version is not None:
+            session_data["messages"][message_index]["messages_per_version"] = messages_per_version
         
         with open(session_file, "w") as f:
             json.dump(session_data, f, indent=2)
@@ -99,10 +147,17 @@ class ChatHistoryManager:
             try:
                 with open(session_file, "r") as f:
                     session_data = json.load(f)
+                
+                # Get first query if available
+                first_query = None
+                if session_data["messages"]:
+                    first_query = session_data["messages"][0].get("query", "")
+                
                 sessions.append({
                     "session_id": session_data["session_id"],
                     "created_at": session_data["created_at"],
                     "num_messages": len(session_data["messages"]),
+                    "first_query": first_query,
                 })
             except (json.JSONDecodeError, KeyError):
                 continue

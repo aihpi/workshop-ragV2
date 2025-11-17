@@ -1,6 +1,7 @@
 """Chat history API routes."""
 from fastapi import APIRouter, HTTPException
-from typing import List, Dict
+from typing import List, Dict, Optional
+from pydantic import BaseModel
 
 from app.services import ChatHistoryManager
 from app.core.config import settings
@@ -9,6 +10,13 @@ router = APIRouter()
 
 # Initialize chat manager
 chat_manager = ChatHistoryManager(history_folder=settings.CHAT_HISTORY_FOLDER)
+
+
+class MessageUpdateRequest(BaseModel):
+    """Request to update a message with version information."""
+    versions: Optional[List[str]] = None
+    versions_chunks: Optional[List[List[Dict]]] = None
+    messages_per_version: Optional[List[List[Dict]]] = None
 
 
 @router.post("/new")
@@ -81,3 +89,39 @@ async def delete_session(session_id: str) -> Dict[str, bool]:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting session: {str(e)}")
+
+
+@router.put("/{session_id}/message/{message_index}")
+async def update_message(
+    session_id: str, 
+    message_index: int, 
+    request: MessageUpdateRequest
+) -> Dict[str, bool]:
+    """Update a message with version information.
+    
+    Args:
+        session_id: Chat session ID
+        message_index: Index of the message to update (0-based)
+        request: Update request with version data
+        
+    Returns:
+        Success status
+    """
+    try:
+        if not chat_manager.session_exists(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        chat_manager.update_message(
+            session_id=session_id,
+            message_index=message_index,
+            versions=request.versions,
+            versions_chunks=request.versions_chunks,
+            messages_per_version=request.messages_per_version
+        )
+        return {"success": True}
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating message: {str(e)}")

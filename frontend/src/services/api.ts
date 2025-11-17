@@ -1,7 +1,7 @@
 // API client for RAG backend
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export interface Document {
   document_id: string;
@@ -44,6 +44,7 @@ export interface ChatSession {
   session_id: string;
   created_at: string;
   num_messages: number;
+  first_query?: string;
 }
 
 export interface ChatMessage {
@@ -51,6 +52,9 @@ export interface ChatMessage {
   query: string;
   answer: string;
   chunks: RetrievedChunk[];
+  versions?: string[];
+  versions_chunks?: RetrievedChunk[][];
+  messages_per_version?: any[][];
 }
 
 export interface PromptTemplate {
@@ -119,19 +123,21 @@ export const queryRAGStream = (
   onDone: () => void,
   onError: (error: string) => void
 ) => {
-  const eventSource = new EventSource(
-    `${API_BASE_URL}/api/v1/query/query/stream?${new URLSearchParams({
-      query: request.query,
-      top_k: String(request.top_k || 5),
-      temperature: String(request.temperature || 0.7),
-      max_tokens: String(request.max_tokens || 512),
-      top_p: String(request.top_p || 0.9),
-      top_k_sampling: String(request.top_k_sampling || 40),
-      use_chat_history: String(request.use_chat_history || false),
-      ...(request.chat_id && { chat_id: request.chat_id }),
-      ...(request.prompt && { prompt: request.prompt }),
-    })}`
-  );
+  const baseUrl = API_BASE_URL || window.location.origin;
+  const url = `${baseUrl}/api/v1/query/query/stream?${new URLSearchParams({
+    query: request.query,
+    top_k: String(request.top_k || 5),
+    temperature: String(request.temperature || 0.7),
+    max_tokens: String(request.max_tokens || 512),
+    top_p: String(request.top_p || 0.9),
+    top_k_sampling: String(request.top_k_sampling || 40),
+    use_chat_history: String(request.use_chat_history || false),
+    ...(request.chat_id && { chat_id: request.chat_id }),
+    ...(request.prompt && { prompt: request.prompt }),
+  })}`;
+  
+  console.log('Connecting to EventSource:', url);
+  const eventSource = new EventSource(url);
 
   eventSource.onmessage = (event) => {
     try {
@@ -182,6 +188,21 @@ export const deleteChatSession = async (sessionId: string) => {
   return response.data;
 };
 
+export const updateChatMessage = async (
+  sessionId: string, 
+  messageIndex: number,
+  versions?: string[],
+  versionsChunks?: RetrievedChunk[][],
+  messagesPerVersion?: any[][]
+) => {
+  const response = await api.put(`/chat/${sessionId}/message/${messageIndex}`, {
+    versions,
+    versions_chunks: versionsChunks,
+    messages_per_version: messagesPerVersion
+  });
+  return response.data;
+};
+
 // Prompt APIs
 export const getPrompts = async (): Promise<PromptTemplate[]> => {
   try {
@@ -222,7 +243,7 @@ export interface ModelInfo {
   downloaded: boolean;
   active: boolean;
   size?: string;
-  downloadProgress?: number;
+  gated?: boolean;
 }
 
 export interface DownloadProgress {
@@ -234,7 +255,7 @@ export interface DownloadProgress {
 
 export const getAvailableModels = async (): Promise<ModelInfo[]> => {
   try {
-    const response = await api.get('/models/models');
+    const response = await api.get('/models');
     return response.data.models;
   } catch (error) {
     console.error('Error fetching models:', error);
@@ -242,9 +263,12 @@ export const getAvailableModels = async (): Promise<ModelInfo[]> => {
   }
 };
 
-export const downloadModel = async (modelId: string): Promise<boolean> => {
+export const downloadModel = async (modelId: string, hfToken?: string): Promise<boolean> => {
   try {
-    await api.post('/models/models/download', { model_id: modelId });
+    await api.post('/models/download', { 
+      model_id: modelId,
+      hf_token: hfToken 
+    });
     return true;
   } catch (error) {
     console.error('Error downloading model:', error);
@@ -254,7 +278,7 @@ export const downloadModel = async (modelId: string): Promise<boolean> => {
 
 export const setActiveModel = async (modelId: string): Promise<boolean> => {
   try {
-    await api.post('/models/models/set-active', { model_id: modelId });
+    await api.post('/models/set-active', { model_id: modelId });
     return true;
   } catch (error) {
     console.error('Error setting active model:', error);
@@ -264,7 +288,7 @@ export const setActiveModel = async (modelId: string): Promise<boolean> => {
 
 export const deleteModel = async (modelId: string): Promise<boolean> => {
   try {
-    await api.delete(`/models/models/${modelId}`);
+    await api.post('/models/delete', { model_id: modelId });
     return true;
   } catch (error) {
     console.error('Error deleting model:', error);
@@ -274,7 +298,7 @@ export const deleteModel = async (modelId: string): Promise<boolean> => {
 
 export const getDownloadProgress = async (modelId: string): Promise<DownloadProgress | null> => {
   try {
-    const response = await api.get(`/models/models/download-progress/${modelId}`);
+    const response = await api.get(`/models/download-progress/${modelId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching download progress:', error);

@@ -14,12 +14,29 @@ mkdir -p "$QDRANT_STORAGE"
 # Check if Docker is available
 if command -v docker &> /dev/null; then
     echo "Starting Qdrant with Docker..."
-    docker run -d \
-        --name qdrant \
-        -p $QDRANT_PORT:6333 \
-        -v "$(pwd)/$QDRANT_STORAGE:/qdrant/storage" \
-        qdrant/qdrant
-    echo "✓ Qdrant started on port $QDRANT_PORT"
+    
+    # Check if container already exists
+    if [ "$(docker ps -aq -f name=^qdrant$)" ]; then
+        # Container exists, check if it's running
+        if [ "$(docker ps -q -f name=^qdrant$)" ]; then
+            echo "✓ Qdrant container is already running"
+        else
+            echo "Starting existing Qdrant container..."
+            docker start qdrant
+            echo "✓ Qdrant container started"
+        fi
+    else
+        # Container doesn't exist, create it
+        echo "Creating new Qdrant container..."
+        docker run -d \
+            --name qdrant \
+            -p $QDRANT_PORT:6333 \
+            -v "$(pwd)/$QDRANT_STORAGE:/qdrant/storage" \
+            qdrant/qdrant
+        echo "✓ Qdrant container created and started"
+    fi
+    
+    echo "✓ Qdrant is running on port $QDRANT_PORT"
     echo "  Dashboard: http://localhost:6333/dashboard"
 else
     echo "Docker not found. Installing Qdrant locally..."

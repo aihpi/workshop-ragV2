@@ -12,27 +12,12 @@ class LLMService:
         """Initialize LLM service."""
         self.base_url = f"http://{settings.VLLM_HOST}:{settings.VLLM_PORT}"
         self.default_model = settings.LLM_MODEL
+        self.api_key = "dummy"  # API key for vLLM server
     
     async def get_active_model(self) -> str:
-        """Get the currently active model from the models API."""
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get("http://localhost:8080/api/v1/models/models/active")
-                if response.status_code == 200:
-                    data = response.json()
-                    active_model = data.get("active_model")
-                    if active_model:
-                        # Convert our model ID to the HuggingFace model name
-                        model_mapping = {
-                            "qwen2.5:1.5b-instruct": "Qwen/Qwen2.5-1.5B-Instruct",
-                            "qwen2.5:3b-instruct": "Qwen/Qwen2.5-3B-Instruct", 
-                            "qwen2.5:7b-instruct": "Qwen/Qwen2.5-7B-Instruct"
-                        }
-                        return model_mapping.get(active_model, self.default_model)
-        except Exception as e:
-            print(f"Error getting active model: {e}")
-            # Fallback to default model if API call fails
-            pass
+        """Get the currently active model from vLLM."""
+        # Simply use the model that vLLM was started with
+        # You can query vLLM's /v1/models endpoint if needed, but the model path is sufficient
         return self.default_model
     
     def create_prompt(
@@ -106,10 +91,16 @@ Please provide a comprehensive answer based on the documents above. If the docum
         """
         model = await self.get_active_model()
         
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        
+        print(f"Starting stream request to {self.base_url}/v1/completions")
+        print(f"Model: {model}, max_tokens: {max_tokens}")
+        
         async with httpx.AsyncClient(timeout=300.0) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/v1/completions",
+                headers=headers,
                 json={
                     "model": model,
                     "prompt": prompt,
@@ -120,19 +111,35 @@ Please provide a comprehensive answer based on the documents above. If the docum
                     "stream": True,
                 },
             ) as response:
+                print(f"Response status: {response.status_code}")
+                line_count = 0
                 async for line in response.aiter_lines():
+                    line_count += 1
+                    if not line or line.strip() == "":
+                        continue
+                    
+                    print(f"Line {line_count}: {line[:100]}")
+                    
                     if line.startswith("data: "):
                         data = line[6:]
                         if data == "[DONE]":
+                            print("Received [DONE]")
                             break
                         try:
                             chunk = json.loads(data)
                             if "choices" in chunk and len(chunk["choices"]) > 0:
                                 text = chunk["choices"][0].get("text", "")
                                 if text:
+                                    print(f"Yielding token: {text}")
                                     yield text
-                        except json.JSONDecodeError:
+                        except json.JSONDecodeError as e:
+                            print(f"JSON decode error: {e}, line: {line[:100]}")
                             continue
+                        except Exception as e:
+                            print(f"Error processing chunk: {e}")
+                            continue
+                
+                print(f"Stream ended after {line_count} lines")
     
     async def generate(
         self,
@@ -156,9 +163,12 @@ Please provide a comprehensive answer based on the documents above. If the docum
         """
         model = await self.get_active_model()
         
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        
         async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(
                 f"{self.base_url}/v1/completions",
+                headers=headers,
                 json={
                     "model": model,
                     "prompt": prompt,

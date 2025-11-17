@@ -1,34 +1,79 @@
-import React, { useState } from 'react';
+import { theme } from '../theme';
+import React, { useState, useRef } from 'react';
 import { searchDocuments, RetrievedChunk } from '../services/api';
 
-const RetrievedPassages: React.FC = () => {
-  const [query, setQuery] = useState('');
+interface RAGChatState {
+  messages: any[];
+  query: string;
+  isStreaming: boolean;
+  showParameters: boolean;
+  currentChunks: any[];
+  currentAnswer: string;
+  enableChatHistory: boolean;
+  maxTokens: number;
+  relevanceThreshold: number;
+  topN: number;
+  topK: number;
+  temperature: number;
+  topP: number;
+}
+
+interface RetrievedPassagesProps {
+  ragChatState: RAGChatState;
+  setRagChatState: React.Dispatch<React.SetStateAction<RAGChatState>>;
+}
+
+const RetrievedPassages: React.FC<RetrievedPassagesProps> = ({ ragChatState, setRagChatState }) => {
+  const [localQuery, setLocalQuery] = useState('');
   const [chunks, setChunks] = useState<RetrievedChunk[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [topK, setTopK] = useState(10);
-  const [scoreThreshold, setScoreThreshold] = useState(0.0);
-  const [showMetadata, setShowMetadata] = useState(true);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { topK, relevanceThreshold } = ragChatState;
+
+  const handleResetParameters = () => {
+    setRagChatState(prev => ({
+      ...prev,
+      topK: 10,
+      relevanceThreshold: 0.0,
+      topN: 3,
+      maxTokens: 300,
+      temperature: 0.7,
+      topP: 0.9,
+    }));
+  };
 
   const handleSearch = async () => {
-    if (!query.trim()) return;
+    if (!localQuery.trim() || isLoading) return;
 
+    console.log('Starting search with:', { query: localQuery, topK, relevanceThreshold });
     setIsLoading(true);
     try {
-      const results = await searchDocuments(query, topK, scoreThreshold);
+      const results = await searchDocuments(localQuery, topK, relevanceThreshold);
+      console.log('Search results:', results);
       setChunks(results);
+      
+      if (results.length === 0) {
+        alert(`No results found. Try adjusting the score threshold (currently ${relevanceThreshold.toFixed(2)}) or search for different terms.`);
+      }
     } catch (error) {
       console.error('Search error:', error);
-      alert('Error searching documents. Please try again.');
+      alert(`Error searching documents: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSearch();
+  };
+
   const getScoreColor = (score: number) => {
-    if (score >= 0.8) return '#059669'; // green
-    if (score >= 0.6) return '#d97706'; // orange
-    if (score >= 0.4) return '#dc2626'; // red
-    return '#6b7280'; // gray
+    if (score >= 0.8) return theme.colors.layout.primary;
+    if (score >= 0.6) return '#d97706';
+    if (score >= 0.4) return theme.colors.accent.primary;
+    return '#6b7280';
   };
 
   const getScoreLabel = (score: number) => {
@@ -39,121 +84,43 @@ const RetrievedPassages: React.FC = () => {
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Search Interface */}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      {/* Results Area - Same position as messages in Chat view */}
       <div style={{ 
-        padding: '16px',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        marginBottom: '16px',
-        backgroundColor: '#f9fafb'
+        flex: 1,
+        overflowY: 'auto',
+        padding: '16px 24px',
+        marginBottom: '16px'
       }}>
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-            Search Query:
-          </label>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Enter your search query..."
-              style={{
-                flex: 1,
-                padding: '12px',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: '#ffffff',
-                color: '#333333'
-              }}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            />
-            <button
-              onClick={handleSearch}
-              disabled={!query.trim() || isLoading}
-              style={{
-                padding: '12px 24px',
-                backgroundColor: isLoading ? '#ccc' : '#2563eb',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              {isLoading ? 'Searching...' : 'Search'}
-            </button>
-          </div>
-        </div>
-
-        {/* Search Parameters */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          alignItems: 'center'
-        }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
-              Top K Results: {topK}
-            </label>
-            <input
-              type="range"
-              min="1"
-              max="50"
-              value={topK}
-              onChange={(e) => setTopK(Number(e.target.value))}
-              style={{ width: '100%' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
-              Score Threshold: {scoreThreshold.toFixed(2)}
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={scoreThreshold}
-              onChange={(e) => setScoreThreshold(Number(e.target.value))}
-              style={{ width: '100%' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
-              <input
-                type="checkbox"
-                checked={showMetadata}
-                onChange={(e) => setShowMetadata(e.target.checked)}
-              />
-              Show Metadata
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Results */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
         {chunks.length === 0 && !isLoading && (
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
             height: '200px',
-            color: '#6b7280',
+            color: theme.colors.text.tertiary,
             fontSize: '16px'
           }}>
             Enter a search query to retrieve relevant passages
           </div>
         )}
 
-        {chunks.length > 0 && (
-          <div style={{ marginBottom: '16px' }}>
-            <h3 style={{ margin: '0 0 16px 0' }}>
+        {isLoading && (
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            height: '200px',
+            color: theme.colors.text.secondary,
+            fontSize: '16px'
+          }}>
+            Searching...
+          </div>
+        )}
+
+        {chunks.length > 0 && !isLoading && (
+          <div>
+            <h3 style={{ margin: '0 0 16px 0', color: theme.colors.text.primary }}>
               Retrieved Passages ({chunks.length} results)
             </h3>
             
@@ -162,25 +129,24 @@ const RetrievedPassages: React.FC = () => {
                 <div
                   key={chunk.document_id + '-' + chunk.chunk_index}
                   style={{
-                    border: '1px solid #ddd',
+                    border: `1px solid ${theme.colors.text.quaternary}`,
                     borderRadius: '8px',
                     padding: '16px',
-                    backgroundColor: 'white'
+                    backgroundColor: theme.colors.white
                   }}
                 >
-                  {/* Header */}
                   <div style={{ 
                     display: 'flex', 
                     justifyContent: 'space-between', 
                     alignItems: 'center',
                     marginBottom: '12px',
                     paddingBottom: '8px',
-                    borderBottom: '1px solid #eee'
+                    borderBottom: `1px solid ${theme.colors.text.quaternary}`
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <span style={{ 
                         fontWeight: 'bold',
-                        color: '#374151'
+                        color: theme.colors.text.primary
                       }}>
                         Passage #{index + 1}
                       </span>
@@ -189,17 +155,17 @@ const RetrievedPassages: React.FC = () => {
                         borderRadius: '4px',
                         fontSize: '12px',
                         fontWeight: 'bold',
-                        color: 'white',
+                        color: theme.colors.white,
                         backgroundColor: getScoreColor(chunk.score)
                       }}>
                         {getScoreLabel(chunk.score)} ({chunk.score.toFixed(3)})
                       </span>
                     </div>
                     
-                    {showMetadata && chunk.filename && (
+                    {chunk.filename && (
                       <span style={{
                         fontSize: '12px',
-                        color: '#6b7280',
+                        color: theme.colors.text.tertiary,
                         fontFamily: 'monospace'
                       }}>
                         📄 {chunk.filename}
@@ -207,89 +173,150 @@ const RetrievedPassages: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Content */}
                   <div style={{
                     lineHeight: '1.6',
-                    color: '#374151',
-                    marginBottom: showMetadata ? '12px' : '0'
+                    color: theme.colors.text.primary
                   }}>
                     {chunk.content}
                   </div>
-
-                  {/* Metadata */}
-                  {showMetadata && (
-                    <div style={{
-                      padding: '12px',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '6px',
-                      fontSize: '12px'
-                    }}>
-                      <strong>Metadata:</strong>
-                      <div style={{ 
-                        marginTop: '8px',
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                        gap: '8px'
-                      }}>
-                        <div>
-                          <span style={{ fontWeight: 'bold', color: '#374151' }}>
-                            Document ID:
-                          </span>{' '}
-                          <span style={{ color: '#6b7280' }}>
-                            {chunk.document_id}
-                          </span>
-                        </div>
-                        <div>
-                          <span style={{ fontWeight: 'bold', color: '#374171' }}>
-                            Chunk Index:
-                          </span>{' '}
-                          <span style={{ color: '#6b7280' }}>
-                            {chunk.chunk_index}
-                          </span>
-                        </div>
-                        <div>
-                          <span style={{ fontWeight: 'bold', color: '#374151' }}>
-                            Filename:
-                          </span>{' '}
-                          <span style={{ color: '#6b7280' }}>
-                            {chunk.filename}
-                          </span>
-                        </div>
-                        {chunk.metadata && Object.entries(chunk.metadata).map(([key, value]) => (
-                          <div key={key}>
-                            <span style={{ fontWeight: 'bold', color: '#374151' }}>
-                              {key}:
-                            </span>{' '}
-                            <span style={{ color: '#6b7280' }}>
-                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
+            </div>
+
+            <div style={{
+              marginTop: '16px',
+              padding: '12px',
+              backgroundColor: theme.colors.highlight.quaternary,
+              border: `1px solid ${theme.colors.layout.primary}`,
+              borderRadius: '6px',
+              fontSize: '14px',
+              color: theme.colors.text.primary
+            }}>
+              <strong>Search Summary:</strong> Found {chunks.length} passages. 
+              Average score: {(chunks.reduce((sum, c) => sum + c.score, 0) / chunks.length).toFixed(3)}.
+              Top score: {Math.max(...chunks.map(c => c.score)).toFixed(3)}.
             </div>
           </div>
         )}
       </div>
 
-      {/* Summary Stats */}
-      {chunks.length > 0 && (
+      {/* Query Input Form at Bottom - Matching RAGChat layout */}
+      <form onSubmit={handleSubmit} style={{ 
+        padding: '16px 0',
+        borderTop: `1px solid ${theme.colors.text.quaternary}`,
+        backgroundColor: theme.colors.white,
+      }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <textarea
+            ref={inputRef}
+            value={localQuery}
+            onChange={(e) => setLocalQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSearch();
+              }
+            }}
+            placeholder="Enter your search query..."
+            rows={3}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: `1px solid ${theme.colors.text.quaternary}`,
+              borderRadius: '8px',
+              resize: 'vertical',
+              fontFamily: 'inherit',
+              backgroundColor: theme.colors.white,
+              color: theme.colors.text.primary
+            }}
+            disabled={isLoading}
+          />
+          <button
+            type="submit"
+            disabled={!localQuery.trim() || isLoading}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: isLoading ? theme.colors.text.tertiary : theme.colors.accent.primary,
+              color: theme.colors.white,
+              border: 'none',
+              borderRadius: '8px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            {isLoading ? 'Searching...' : 'Send'}
+          </button>
+        </div>
+
+        {/* Parameters - Always shown below the input */}
         <div style={{
           marginTop: '16px',
-          padding: '12px',
-          backgroundColor: '#f0f9ff',
-          border: '1px solid #0ea5e9',
-          borderRadius: '6px',
-          fontSize: '14px'
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '16px'
         }}>
-          <strong>Search Summary:</strong> Found {chunks.length} passages. 
-          Average score: {(chunks.reduce((sum, c) => sum + c.score, 0) / chunks.length).toFixed(3)}.
-          Top score: {Math.max(...chunks.map(c => c.score)).toFixed(3)}.
+          <div>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '8px', 
+              fontSize: '14px',
+              color: theme.colors.text.secondary,
+              fontWeight: 'bold'
+            }}>
+              Top K Results: {topK}
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="50"
+              value={topK}
+              onChange={(e) => setRagChatState(prev => ({ ...prev, topK: Number(e.target.value) }))}
+              style={{ width: '100%', accentColor: theme.colors.layout.primary }}
+            />
+          </div>
+
+          <div>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '8px', 
+              fontSize: '14px',
+              color: theme.colors.text.secondary,
+              fontWeight: 'bold'
+            }}>
+              Score Threshold: {relevanceThreshold.toFixed(2)}
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={relevanceThreshold}
+              onChange={(e) => setRagChatState(prev => ({ ...prev, relevanceThreshold: Number(e.target.value) }))}
+              style={{ width: '100%', accentColor: theme.colors.layout.primary }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button
+              type="button"
+              onClick={handleResetParameters}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: theme.colors.text.secondary,
+                color: theme.colors.white,
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Reset
+            </button>
+          </div>
         </div>
-      )}
+      </form>
     </div>
   );
 };

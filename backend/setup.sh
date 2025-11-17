@@ -35,35 +35,22 @@ fi
 # Create virtual environment and install dependencies with uv
 echo ""
 if command -v uv &> /dev/null; then
-    echo "Creating virtual environment with uv..."
-    uv venv
-    echo "Installing dependencies with uv add..."
+    if [ -d ".venv" ]; then
+        echo "Virtual environment already exists, syncing dependencies..."
+        uv sync
+    else
+        echo "Creating virtual environment with uv..."
+        uv venv
+        echo "Installing dependencies from pyproject.toml..."
+        uv sync
+    fi
     
-    # Install dependencies one by one using uv add
-    uv add "fastapi>=0.109.0"
-    uv add "uvicorn[standard]>=0.27.0"
-    uv add "qdrant-client>=1.7.0"
-    uv add "sentence-transformers>=2.3.0"
-    uv add "python-multipart>=0.0.6"
-    uv add "PyPDF2>=3.0.1"
-    uv add "python-docx>=1.1.0"
-    uv add "beautifulsoup4>=4.12.2"
-    uv add "lxml>=5.0.0"
-    uv add "pydantic>=2.5.0"
-    uv add "pydantic-settings>=2.1.0"
-    uv add "httpx>=0.26.0"
-    uv add "aiofiles>=23.2.1"
-    
-    # Skip vllm for now as it requires GPU/special setup
-    echo "Note: vLLM will be installed separately when starting the LLM server"
-    
+    echo "✓ Dependencies installed"
 else
     echo "Error: uv not found. Please install uv first."
     echo "Install uv with: curl -LsSf https://astral.sh/uv/install.sh | sh"
     exit 1
 fi
-
-echo "✓ Dependencies installed"
 
 echo ""
 echo "===== Setup Complete ====="

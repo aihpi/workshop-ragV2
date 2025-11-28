@@ -13,12 +13,28 @@ class LLMService:
         self.base_url = f"http://{settings.VLLM_HOST}:{settings.VLLM_PORT}"
         self.default_model = settings.LLM_MODEL
         self.api_key = "dummy"  # API key for vLLM server
+        self._cached_model: Optional[str] = None
     
     async def get_active_model(self) -> str:
         """Get the currently active model from vLLM."""
-        # Simply use the model that vLLM was started with
-        # You can query vLLM's /v1/models endpoint if needed, but the model path is sufficient
-        return self.default_model
+        # Query vLLM to get the actual loaded model
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                headers = {"Authorization": f"Bearer {self.api_key}"}
+                response = await client.get(
+                    f"{self.base_url}/v1/models",
+                    headers=headers
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if "data" in data and len(data["data"]) > 0:
+                        self._cached_model = data["data"][0]["id"]
+                        return self._cached_model
+        except Exception as e:
+            print(f"Error getting model from vLLM: {e}")
+        
+        # Fallback to cached or default
+        return self._cached_model or self.default_model
     
     def create_prompt(
         self,

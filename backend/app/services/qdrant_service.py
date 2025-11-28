@@ -1,5 +1,5 @@
-"""Qdrant vector database service."""
-from typing import List, Dict, Optional
+"""Qdrant vector database service with Graph RAG support."""
+from typing import List, Dict, Optional, Any, Union
 import hashlib
 import uuid
 from qdrant_client import QdrantClient
@@ -10,6 +10,7 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
+    MatchAny,
 )
 from app.core.config import settings
 
@@ -210,3 +211,229 @@ class QdrantService:
             limit=1,
         )
         return len(result[0]) > 0
+    
+    async def upsert_points(
+        self,
+        collection_name: str,
+        points: List[Dict[str, Any]]
+    ) -> None:
+        """Upsert points with custom IDs and metadata.
+        
+        Args:
+            collection_name: Target collection name
+            points: List of points with id, vector, and payload
+        """
+        qdrant_points = []
+        for point in points:
+            # Generate UUID from string ID if needed
+            point_id = point["id"]
+            if isinstance(point_id, str) and not self._is_valid_uuid(point_id):
+                # Hash the string ID to create a valid UUID
+                hash_object = hashlib.sha256(point_id.encode())
+                hex_dig = hash_object.hexdigest()
+                point_id = f"{hex_dig[:8]}-{hex_dig[8:12]}-{hex_dig[12:16]}-{hex_dig[16:20]}-{hex_dig[20:32]}"
+            
+            qdrant_points.append(
+                PointStruct(
+                    id=point_id,
+                    vector=point["vector"],
+                    payload=point["payload"],
+                )
+            )
+        
+        self.client.upsert(
+            collection_name=collection_name,
+            points=qdrant_points,
+        )
+    
+    def _is_valid_uuid(self, val: str) -> bool:
+        """Check if string is a valid UUID."""
+        try:
+            uuid.UUID(str(val))
+            return True
+        except ValueError:
+            return False
+    
+    def search_with_entity_filter(
+        self,
+        query_embedding: List[float],
+        entity_ids: List[str],
+        top_k: int = 5,
+    ) -> List[Dict]:
+        """Search for similar chunks filtered by entity IDs.
+        
+        Used for pre_filter Graph RAG strategy.
+        
+        Args:
+            query_embedding: Query embedding vector
+            entity_ids: List of entity IDs to filter by
+            top_k: Number of results to return
+            
+        Returns:
+            List of search results with scores
+        """
+        query_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="entity_id",
+                    match=MatchAny(any=entity_ids),
+                )
+            ]
+        )
+        
+        results = self.client.search(
+            collection_name=self.collection_name,
+            query_vector=query_embedding,
+            limit=top_k,
+            query_filter=query_filter,
+        )
+        
+        return self._format_search_results(results)
+    
+    def search_with_metadata(
+        self,
+        query_embedding: List[float],
+        top_k: int = 5,
+        document_id: Optional[str] = None,
+        entity_type: Optional[str] = None,
+    ) -> List[Dict]:
+        """Search with optional metadata filters.
+        
+        Args:
+            query_embedding: Query embedding vector
+            top_k: Number of results to return
+            document_id: Optional filter by document ID
+            entity_type: Optional filter by entity type
+            
+        Returns:
+            List of search results with enriched metadata
+        """
+        conditions = []
+        
+        if document_id:
+            conditions.append(
+                FieldCondition(
+                    key="document_id",
+                    match=MatchValue(value=document_id),
+                )
+            )
+        
+        if entity_type:
+            conditions.append(
+                FieldCondition(
+                    key="entity_type",
+                    match=MatchValue(value=entity_type),
+                )
+            )
+        
+        query_filter = Filter(must=conditions) if conditions else None
+        
+        results = self.client.search(
+            collection_name=self.collection_name,
+            query_vector=query_embedding,
+            limit=top_k,
+            query_filter=query_filter,
+        )
+        
+        return self._format_search_results(results)
+    
+    def _format_search_results(self, results) -> List[Dict]:
+        """Format search results with all available metadata.
+        
+        Args:
+            results: Raw Qdrant search results
+            
+        Returns:
+            Formatted results with metadata
+        """
+        formatted = []
+        for result in results:
+            item = {
+                "content": result.payload.get("content", ""),
+                "document_id": result.payload.get("document_id", ""),
+                "filename": result.payload.get("filename", ""),
+                "chunk_index": result.payload.get("chunk_index", 0),
+                "score": result.score,
+            }
+            
+            # Add enriched metadata if available
+            if "entity_id" in result.payload:
+                item["entity_id"] = result.payload["entity_id"]
+            if "entity_type" in result.payload:
+                item["entity_type"] = result.payload["entity_type"]
+            if "bookmark_id" in result.payload:
+                item["bookmark_id"] = result.payload["bookmark_id"]
+            if "glossary_term_ids" in result.payload:
+                item["glossary_term_ids"] = result.payload["glossary_term_ids"]
+            if "status" in result.payload:
+                item["status"] = result.payload["status"]
+            if "anforderung_typ" in result.payload:
+                item["anforderung_typ"] = result.payload["anforderung_typ"]
+            if "baustein_code" in result.payload:
+                item["baustein_code"] = result.payload["baustein_code"]
+            if "roles" in result.payload:
+                item["roles"] = result.payload["roles"]
+            if "cross_references" in result.payload:
+                item["cross_references"] = result.payload["cross_references"]
+            
+            formatted.append(item)
+        
+        return formatted
+    
+    def get_chunks_by_entity_ids(
+        self,
+        entity_ids: List[str],
+        limit: int = 100
+    ) -> List[Dict]:
+        """Get all chunks for specific entity IDs.
+        
+        Used for post_enrich Graph RAG strategy.
+        
+        Args:
+            entity_ids: List of entity IDs
+            limit: Maximum chunks per entity
+            
+        Returns:
+            List of chunks with metadata
+        """
+        all_chunks = []
+        
+        for entity_id in entity_ids:
+            scroll_result = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="entity_id",
+                            match=MatchValue(value=entity_id),
+                        )
+                    ]
+                ),
+                limit=limit,
+            )
+            
+            for point in scroll_result[0]:
+                chunk = {
+                    "content": point.payload.get("content", ""),
+                    "entity_id": entity_id,
+                    "entity_type": point.payload.get("entity_type", ""),
+                    "bookmark_id": point.payload.get("bookmark_id"),
+                }
+                all_chunks.append(chunk)
+        
+        return all_chunks
+    
+    def get_entity_ids_from_results(self, results: List[Dict]) -> List[str]:
+        """Extract unique entity IDs from search results.
+        
+        Args:
+            results: Search results
+            
+        Returns:
+            List of unique entity IDs
+        """
+        entity_ids = set()
+        for result in results:
+            if "entity_id" in result:
+                entity_ids.add(result["entity_id"])
+        return list(entity_ids)

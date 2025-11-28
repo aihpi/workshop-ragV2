@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PromptManagement from './PromptManagement';
 import DocumentManagement from './DocumentManagement';
 import { theme } from '../theme';
+import { 
+  uploadXMLFile, 
+  getXMLJobs, 
+  deleteXMLJob, 
+  streamJobProgress, 
+  getGraphStats, 
+  getXMLPresets,
+  XMLJob,
+  XMLPreset
+} from '../services/api';
 
 interface SettingsProps {
   onBackToChat?: () => void;
@@ -13,6 +23,7 @@ type SettingsSection =
   | 'prompt-management' 
   | 'query-transformation' 
   | 'data' 
+  | 'xml-processing'
   | 'customize' 
   | 'model-configuration' 
   | 'information';
@@ -24,6 +35,7 @@ const Settings: React.FC<SettingsProps> = ({ onBackToChat, prompts, setPrompts }
     { id: 'prompt-management' as const, label: 'Prompt Management', icon: '📝' },
     { id: 'query-transformation' as const, label: 'Query Transformation', icon: '🔄' },
     { id: 'data' as const, label: 'Data', icon: '📊' },
+    { id: 'xml-processing' as const, label: 'XML Processing', icon: '🗂️' },
     { id: 'customize' as const, label: 'Customize', icon: '⚙️' },
     { id: 'model-configuration' as const, label: 'Model Configuration', icon: '🤖' },
     { id: 'information' as const, label: 'Information', icon: 'ℹ️' },
@@ -164,6 +176,7 @@ const Settings: React.FC<SettingsProps> = ({ onBackToChat, prompts, setPrompts }
           {activeSection === 'prompt-management' && <PromptManagementSection prompts={prompts} setPrompts={setPrompts} />}
           {activeSection === 'query-transformation' && <QueryTransformationSection />}
           {activeSection === 'data' && <DataSection />}
+          {activeSection === 'xml-processing' && <XMLProcessingSection />}
           {activeSection === 'customize' && <CustomizeSection />}
           {activeSection === 'model-configuration' && <ModelConfigurationSection />}
           {activeSection === 'information' && <InformationSection />}
@@ -237,6 +250,454 @@ const DataSection: React.FC = () => {
       </p>
       <DocumentManagement />
       <ResetButton section="Data" disabled />
+    </div>
+  );
+};
+
+interface GraphStatsData {
+  total_nodes: number;
+  total_relationships: number;
+  total_documents: number;
+  nodes_by_type: Record<string, number>;
+  relationships_by_type: Record<string, number>;
+}
+
+const XMLProcessingSection: React.FC = () => {
+  const [jobs, setJobs] = useState<XMLJob[]>([]);
+  const [presets, setPresets] = useState<XMLPreset[]>([]);
+  const [graphStats, setGraphStats] = useState<GraphStatsData | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeJobProgress, setActiveJobProgress] = useState<Record<string, number>>({});
+
+  // Load initial data
+  const loadData = useCallback(async () => {
+    try {
+      const [jobsResponse, presetsData, statsData] = await Promise.all([
+        getXMLJobs(),
+        getXMLPresets(),
+        getGraphStats().catch(() => null)  // Graph stats may fail if Neo4j not connected
+      ]);
+      setJobs(jobsResponse.jobs || []);
+      setPresets(presetsData);
+      if (statsData) setGraphStats(statsData);
+      if (presetsData.length > 0 && !selectedPreset) {
+        setSelectedPreset(presetsData[0].name);
+      }
+    } catch (err) {
+      console.error('Failed to load XML processing data:', err);
+    }
+  }, [selectedPreset]);
+
+  useEffect(() => {
+    loadData();
+    // Poll for job updates every 5 seconds
+    const interval = setInterval(loadData, 5000);
+    return () => clearInterval(interval);
+  }, [loadData]);
+
+  // Stream progress for active jobs
+  useEffect(() => {
+    const activeJobs = jobs.filter(j => j.status === 'running' || j.status === 'pending');
+    activeJobs.forEach(job => {
+      if (!activeJobProgress[job.job_id]) {
+        streamJobProgress(
+          job.job_id,
+          (progress) => {
+            setActiveJobProgress(prev => ({ ...prev, [job.job_id]: progress.progress * 100 }));
+          },
+          () => {
+            loadData();
+          },
+          (error) => {
+            console.error('Job progress error:', error);
+            loadData();
+          }
+        );
+        // Store cleanup (simplified - just mark as tracked)
+        setActiveJobProgress(prev => ({ ...prev, [job.job_id]: job.progress }));
+      }
+    });
+  }, [jobs, activeJobProgress, loadData]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.name.endsWith('.xml')) {
+        setError('Please select an XML file');
+        return;
+      }
+      setSelectedFile(file);
+      setError(null);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !selectedPreset) {
+      setError('Please select a file and preset');
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      await uploadXMLFile(selectedFile, { preset_name: selectedPreset });
+      // Refresh jobs list after upload
+      loadData();
+      setSelectedFile(null);
+      // Reset file input
+      const fileInput = document.getElementById('xml-file-input') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload XML document');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    if (!confirm('Are you sure you want to delete this job and its data?')) return;
+    
+    try {
+      await deleteXMLJob(jobId);
+      setJobs(prev => prev.filter(j => j.job_id !== jobId));
+      loadData(); // Refresh stats
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete job');
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return '#059669';
+      case 'running': return '#0284c7';
+      case 'pending': return '#d97706';
+      case 'failed': return '#dc2626';
+      default: return theme.colors.text.secondary;
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return '✅';
+      case 'running': return '⏳';
+      case 'pending': return '🕐';
+      case 'failed': return '❌';
+      default: return '❓';
+    }
+  };
+
+  return (
+    <div style={{ width: '100%' }}>
+      <h2 style={{ margin: '0 0 16px 0' }}>XML Processing</h2>
+      <p style={{ color: theme.colors.text.secondary, marginBottom: '24px' }}>
+        Upload and process XML documents to extract entities and build the knowledge graph.
+      </p>
+
+      {error && (
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #dc2626',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          color: '#dc2626'
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* Upload Section */}
+      <div style={{
+        padding: '20px',
+        backgroundColor: theme.colors.white,
+        border: `1px solid ${theme.colors.text.quaternary}`,
+        borderRadius: '8px',
+        marginBottom: '24px'
+      }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px' }}>Upload XML Document</h3>
+        
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {/* Preset Selection */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>
+              Document Type Preset
+            </label>
+            <select
+              value={selectedPreset}
+              onChange={(e) => setSelectedPreset(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: `1px solid ${theme.colors.text.quaternary}`,
+                borderRadius: '6px',
+                fontSize: '14px',
+                backgroundColor: theme.colors.white
+              }}
+            >
+              {presets.map(preset => (
+                <option key={preset.name} value={preset.name}>
+                  {preset.name} - {preset.description}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* File Selection */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '14px' }}>
+              XML File
+            </label>
+            <input
+              id="xml-file-input"
+              type="file"
+              accept=".xml"
+              onChange={handleFileSelect}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: `1px solid ${theme.colors.text.quaternary}`,
+                borderRadius: '6px',
+                fontSize: '14px',
+                backgroundColor: theme.colors.white
+              }}
+            />
+            {selectedFile && (
+              <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: theme.colors.text.secondary }}>
+                Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+              </p>
+            )}
+          </div>
+
+          {/* Upload Button */}
+          <button
+            onClick={handleUpload}
+            disabled={uploading || !selectedFile || !selectedPreset}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: uploading || !selectedFile ? theme.colors.text.tertiary : theme.colors.accent.primary,
+              color: theme.colors.white,
+              border: 'none',
+              borderRadius: '6px',
+              cursor: uploading || !selectedFile ? 'not-allowed' : 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            {uploading ? (
+              <>⏳ Uploading...</>
+            ) : (
+              <>📤 Upload & Process</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Graph Statistics */}
+      {graphStats && (
+        <div style={{
+          padding: '20px',
+          backgroundColor: theme.colors.white,
+          border: `1px solid ${theme.colors.text.quaternary}`,
+          borderRadius: '8px',
+          marginBottom: '24px'
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '16px' }}>🕸️ Knowledge Graph Statistics</h3>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f0f9ff',
+              borderRadius: '8px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0284c7' }}>
+                {graphStats.total_nodes.toLocaleString()}
+              </div>
+              <div style={{ fontSize: '12px', color: theme.colors.text.secondary, marginTop: '4px' }}>
+                Total Nodes
+              </div>
+            </div>
+            
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f0fdf4',
+              borderRadius: '8px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#059669' }}>
+                {graphStats.total_relationships.toLocaleString()}
+              </div>
+              <div style={{ fontSize: '12px', color: theme.colors.text.secondary, marginTop: '4px' }}>
+                Relationships
+              </div>
+            </div>
+          </div>
+
+          {Object.keys(graphStats.nodes_by_type).length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: theme.colors.text.secondary }}>
+                Nodes by Type
+              </h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {Object.entries(graphStats.nodes_by_type).map(([type, count]) => (
+                  <span
+                    key={type}
+                    style={{
+                      padding: '4px 12px',
+                      backgroundColor: '#f3f4f6',
+                      borderRadius: '16px',
+                      fontSize: '12px'
+                    }}
+                  >
+                    {type}: <strong>{count}</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Jobs List */}
+      <div style={{
+        padding: '20px',
+        backgroundColor: theme.colors.white,
+        border: `1px solid ${theme.colors.text.quaternary}`,
+        borderRadius: '8px'
+      }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px' }}>📋 Processing Jobs</h3>
+        
+        {jobs.length === 0 ? (
+          <p style={{ color: theme.colors.text.secondary, textAlign: 'center', padding: '24px' }}>
+            No XML processing jobs yet. Upload a document to get started.
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {jobs.map(job => (
+              <div
+                key={job.job_id}
+                style={{
+                  padding: '16px',
+                  border: `1px solid ${theme.colors.text.quaternary}`,
+                  borderRadius: '8px',
+                  backgroundColor: '#fafafa'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span>{getStatusIcon(job.status)}</span>
+                      <span style={{ 
+                        fontWeight: 'bold',
+                        color: getStatusColor(job.status),
+                        textTransform: 'capitalize'
+                      }}>
+                        {job.status}
+                      </span>
+                      <span style={{ 
+                        fontSize: '12px', 
+                        color: theme.colors.text.secondary,
+                        backgroundColor: '#e5e7eb',
+                        padding: '2px 8px',
+                        borderRadius: '4px'
+                      }}>
+                        {job.preset_name}
+                      </span>
+                    </div>
+                    
+                    <p style={{ 
+                      margin: '0 0 8px 0', 
+                      fontSize: '14px',
+                      fontFamily: 'monospace',
+                      color: theme.colors.text.secondary,
+                      wordBreak: 'break-all'
+                    }}>
+                      {job.filename}
+                    </p>
+                    
+                    {/* Progress Bar */}
+                    {(job.status === 'running' || job.status === 'pending') && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{
+                          height: '8px',
+                          backgroundColor: '#e5e7eb',
+                          borderRadius: '4px',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${activeJobProgress[job.job_id] || job.progress}%`,
+                            backgroundColor: '#0284c7',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: theme.colors.text.secondary }}>
+                          {(activeJobProgress[job.job_id] || job.progress).toFixed(1)}% complete
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Completion Stats */}
+                    {job.status === 'completed' && (
+                      <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: theme.colors.text.secondary }}>
+                        <span>📄 {job.total_chunks} chunks</span>
+                        <span>🕸️ {job.total_nodes} nodes</span>
+                        <span>🔗 {job.total_relationships} relationships</span>
+                      </div>
+                    )}
+
+                    {/* Error Message */}
+                    {job.status === 'failed' && job.error_message && (
+                      <p style={{ 
+                        margin: '8px 0 0 0', 
+                        fontSize: '12px', 
+                        color: '#dc2626',
+                        backgroundColor: '#fef2f2',
+                        padding: '8px',
+                        borderRadius: '4px'
+                      }}>
+                        {job.error_message}
+                      </p>
+                    )}
+
+                    <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: theme.colors.text.tertiary }}>
+                      Created: {new Date(job.created_at).toLocaleString()}
+                      {job.completed_at && ` • Completed: ${new Date(job.completed_at).toLocaleString()}`}
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={() => handleDeleteJob(job.job_id)}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: 'transparent',
+                      color: '#dc2626',
+                      border: '1px solid #dc2626',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      marginLeft: '16px'
+                    }}
+                    title="Delete job and associated data"
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <ResetButton section="XML Processing" disabled />
     </div>
   );
 };
@@ -491,7 +952,7 @@ const ModelConfigurationSection: React.FC = () => {
 
 const InformationSection: React.FC = () => {
   const systemInfo = {
-    backendUrl: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+    backendUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
     embeddingModel: 'sentence-transformers/all-MiniLM-L6-v2',
     vectorDatabase: 'Qdrant',
     vectorDimensions: 384,

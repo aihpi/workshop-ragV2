@@ -81,3 +81,7 @@ htmlcov/
 models/
 *.bin
 *.safetensors
+
+# Data files
+jobs.db
+uploads/xml/

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { theme } from '../theme';
 
 interface SidebarProps {
@@ -12,6 +12,10 @@ interface SidebarProps {
   onRagToggle: (enabled: boolean) => void;
   retrievalModeEnabled: boolean;
   onRetrievalModeToggle: (enabled: boolean) => void;
+  graphRagEnabled: boolean;
+  onGraphRagToggle: (enabled: boolean) => void;
+  graphRagStrategy: 'none' | 'merge' | 'pre_filter' | 'post_enrich';
+  onGraphRagStrategyChange: (strategy: 'none' | 'merge' | 'pre_filter' | 'post_enrich') => void;
   chatSessions: Array<{
     session_id: string;
     created_at: string;
@@ -34,6 +38,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   onRagToggle,
   retrievalModeEnabled,
   onRetrievalModeToggle,
+  graphRagEnabled,
+  onGraphRagToggle,
+  graphRagStrategy,
+  onGraphRagStrategyChange,
   chatSessions,
   currentSessionId,
   onSelectSession,
@@ -299,6 +307,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            marginBottom: '12px',
           }}>
             <label style={{ fontSize: '14px', color: theme.colors.text.primary }}>Retrieval Mode</label>
             <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px' }}>
@@ -333,6 +342,83 @@ const Sidebar: React.FC<SidebarProps> = ({
               </span>
             </label>
           </div>
+
+          {/* Graph RAG Toggle */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '12px',
+          }}>
+            <label style={{ fontSize: '14px', color: theme.colors.text.primary }}>Graph RAG</label>
+            <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px' }}>
+              <input
+                type="checkbox"
+                checked={graphRagEnabled}
+                onChange={(e) => onGraphRagToggle(e.target.checked)}
+                style={{ opacity: 0, width: 0, height: 0 }}
+              />
+              <span style={{
+                position: 'absolute',
+                cursor: 'pointer',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: graphRagEnabled ? theme.colors.layout.primary : theme.colors.text.tertiary,
+                transition: '0.4s',
+                borderRadius: '24px',
+              }}>
+                <span style={{
+                  position: 'absolute',
+                  content: '',
+                  height: '18px',
+                  width: '18px',
+                  left: graphRagEnabled ? '23px' : '3px',
+                  bottom: '3px',
+                  backgroundColor: theme.colors.white,
+                  transition: '0.4s',
+                  borderRadius: '50%',
+                }}></span>
+              </span>
+            </label>
+          </div>
+
+          {/* Graph RAG Strategy Dropdown - only visible when Graph RAG is enabled */}
+          {graphRagEnabled && (
+            <div style={{
+              marginBottom: '12px',
+              paddingLeft: '8px',
+              borderLeft: `2px solid ${theme.colors.layout.primary}`,
+            }}>
+              <label style={{ 
+                fontSize: '12px', 
+                color: theme.colors.text.secondary,
+                display: 'block',
+                marginBottom: '6px',
+              }}>
+                Strategy
+              </label>
+              <select
+                value={graphRagStrategy}
+                onChange={(e) => onGraphRagStrategyChange(e.target.value as any)}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  border: `1px solid ${theme.colors.text.quaternary}`,
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  backgroundColor: theme.colors.white,
+                  color: theme.colors.text.primary,
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="merge">Merge (Vector + Graph)</option>
+                <option value="pre_filter">Pre-filter (Graph → Vector)</option>
+                <option value="post_enrich">Post-enrich (Vector → Graph)</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Chat History Section */}
@@ -370,7 +456,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                     alignItems: 'center',
                     transition: 'background-color 0.2s ease',
                     position: 'relative',
-                    backgroundColor: hoveredSession === session.session_id ? '#f6a800' : 'transparent',
+                    backgroundColor: currentSessionId === session.session_id 
+                      ? '#f6a800' 
+                      : hoveredSession === session.session_id 
+                        ? 'rgba(246, 168, 0, 0.3)' 
+                        : 'transparent',
                   }}
                   onClick={() => onSelectSession(session.session_id)}
                   onMouseEnter={() => setHoveredSession(session.session_id)}

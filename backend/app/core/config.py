@@ -46,10 +46,29 @@ class Settings(BaseSettings):
     CHUNK_SIZE: int = 512
     CHUNK_OVERLAP: int = 128
     DATA_FOLDER: str = "../data"
+    UPLOAD_FOLDER: str = "../uploads"
     
     # Chat History Settings
     CHAT_HISTORY_FOLDER: str = "../chat_history"
     MAX_CHAT_HISTORY: int = 10
+    
+    # Neo4j Settings
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "neo4jpassword"
+    
+    # Graph RAG Settings
+    GRAPH_DEFAULT_DEPTH: int = 2
+    GRAPH_MAX_DEPTH: int = 4
+    GRAPH_MAX_NODES: int = 200
+    
+    # Job Persistence Settings
+    JOB_RETENTION_DAYS: int = 30
+    JOB_DB_PATH: str = "../jobs.db"
+    MAX_ASYNC_WORKERS: int = 10
+    
+    # XML Processing Settings
+    XML_PRESETS_FOLDER: str = "../xml_presets"
     
     class Config:
         env_file = ".env"

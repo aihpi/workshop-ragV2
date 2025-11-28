@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { queryRAGStream, RetrievedChunk, updateChatMessage } from '../services/api';
 import RetrievedPassagesModal from './RetrievedPassagesModal';
 import { theme } from '../theme';
@@ -46,20 +46,27 @@ interface RAGChatProps {
   setChatState: React.Dispatch<React.SetStateAction<RAGChatState>>;
   currentSessionId: string | null;
   onMessageSent?: () => void;
+  graphRagEnabled?: boolean;
+  graphRagStrategy?: 'none' | 'merge' | 'pre_filter' | 'post_enrich';
 }
 
-const RAGChat: React.FC<RAGChatProps> = ({ activePrompt, chatState, setChatState, currentSessionId, onMessageSent }) => {
+const RAGChat: React.FC<RAGChatProps> = ({ 
+  activePrompt, 
+  chatState, 
+  setChatState, 
+  currentSessionId, 
+  onMessageSent,
+  graphRagEnabled = false,
+  graphRagStrategy = 'none',
+}) => {
   // Use persistent state from props
   const {
     messages,
     query,
     isStreaming,
-    showParameters,
-    currentChunks,
     currentAnswer,
     enableChatHistory,
     maxTokens,
-    relevanceThreshold,
     topN,
     topK,
     temperature,
@@ -75,14 +82,16 @@ const RAGChat: React.FC<RAGChatProps> = ({ activePrompt, chatState, setChatState
     setChatState(prev => ({ ...prev, ...updates }));
   };
 
-  const resetChat = () => {
+  // Reset chat is available for external use if needed
+  const _resetChat = useCallback(() => {
     updateState({
       messages: [],
       currentAnswer: '',
       currentChunks: [],
       isStreaming: false
     });
-  };
+  }, []);
+  void _resetChat; // Suppress unused warning - available for future use
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -129,6 +138,7 @@ const RAGChat: React.FC<RAGChatProps> = ({ activePrompt, chatState, setChatState
         use_chat_history: enableChatHistory,
         chat_id: currentSessionId || undefined,
         prompt: activePrompt?.template,
+        graph_rag_strategy: graphRagEnabled ? graphRagStrategy : 'none',
       },
       (token) => {
         finalAnswer += token;

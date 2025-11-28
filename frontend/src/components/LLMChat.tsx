@@ -1,5 +1,5 @@
 import { theme } from '../theme';
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { updateChatMessage } from '../services/api';
 
 interface Message {
@@ -11,6 +11,7 @@ interface Message {
   versions?: string[]; // Array of response versions
   currentVersionIndex?: number; // Current version being displayed
   messagesPerVersion?: Message[][]; // Complete message list after each version
+  deletedMessagesPerVersion?: Message[][]; // Messages deleted by each version (for undo)
 }
 
 interface LLMChatState {
@@ -38,7 +39,6 @@ const LLMChat: React.FC<LLMChatProps> = ({ chatState, setChatState, currentSessi
     messages,
     query,
     isStreaming,
-    showParameters,
     currentAnswer,
     maxTokens,
     topK,
@@ -432,7 +432,7 @@ const LLMChat: React.FC<LLMChatProps> = ({ chatState, setChatState, currentSessi
                                   
                                   // Convert deleted messages to plain objects
                                   const deletedMessagesPlain = newDeletedMessagesPerVersion.map(versionDeleted => 
-                                    versionDeleted.map(msg => ({
+                                    versionDeleted.map((msg: Message) => ({
                                       query: msg.type === 'user' ? msg.content : undefined,
                                       answer: msg.type === 'assistant' ? msg.content : undefined,
                                       chunks: [],

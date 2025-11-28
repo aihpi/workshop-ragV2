@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any, Optional
 import asyncio
+import aiohttp
 import os
 import subprocess
 import shutil
@@ -13,6 +14,7 @@ class ModelInfo(BaseModel):
     id: str
     name: str
     downloaded: bool
+    downloading: bool = False  # True if download is in progress
     active: bool
     size: str = ""
     gated: bool = False  # Whether model requires HF token
@@ -28,18 +30,14 @@ class ModelDeleteRequest(BaseModel):
     model_id: str
 
 # Available models configuration
+# Optimized for 16GB GPU - only models that fit comfortably
+# Sorted alphabetically by display name
 AVAILABLE_MODELS = {
-    "google/gemma-2-9b-it": {
-        "name": "Gemma 2 9B Instruct 🔒",
-        "size": "~18GB",
-        "gated": True,
-        "local_path": "gemma-2-9b-it"
-    },
-    "meta-llama/Llama-3.1-8B-Instruct": {
-        "name": "Llama 3.1 8B Instruct 🔒",
-        "size": "~16GB",
-        "gated": True,
-        "local_path": "Llama-3.1-8B-Instruct"
+    "CohereForAI/aya-expanse-8b": {
+        "name": "Aya Expanse 8B (Multilingual)",
+        "size": "~12GB",
+        "gated": False,
+        "local_path": "aya-expanse-8b"
     },
     "meta-llama/Llama-3.2-3B-Instruct": {
         "name": "Llama 3.2 3B Instruct 🔒",
@@ -47,17 +45,29 @@ AVAILABLE_MODELS = {
         "gated": True,
         "local_path": "Llama-3.2-3B-Instruct"
     },
+    "nvidia/Mistral-NeMo-Minitron-8B-Instruct": {
+        "name": "Minitron 8B Instruct (NVIDIA)",
+        "size": "~12GB",
+        "gated": False,
+        "local_path": "Mistral-NeMo-Minitron-8B-Instruct"
+    },
     "mistralai/Mistral-7B-Instruct-v0.3": {
         "name": "Mistral 7B Instruct v0.3",
-        "size": "~15GB",
+        "size": "~14GB",
         "gated": False,
         "local_path": "Mistral-7B-Instruct-v0.3"
     },
-    "microsoft/Phi-3-medium-4k-instruct": {
-        "name": "Phi-3 Medium 4K Instruct",
+    "mistralai/Mistral-Nemo-Instruct-2407": {
+        "name": "Mistral Nemo 12B Instruct",
+        "size": "~12GB",
+        "gated": False,
+        "local_path": "Mistral-Nemo-Instruct-2407"
+    },
+    "microsoft/Phi-3.5-mini-instruct": {
+        "name": "Phi 3.5 Mini Instruct (3.8B)",
         "size": "~8GB",
         "gated": False,
-        "local_path": "Phi-3-medium-4k-instruct"
+        "local_path": "Phi-3.5-mini-instruct"
     },
     "Qwen/Qwen2.5-0.5B-Instruct": {
         "name": "Qwen 2.5 0.5B Instruct",
@@ -65,18 +75,18 @@ AVAILABLE_MODELS = {
         "gated": False,
         "local_path": "Qwen2.5-0.5B-Instruct"
     },
+    "Qwen/Qwen2.5-1.5B-Instruct": {
+        "name": "Qwen 2.5 1.5B Instruct",
+        "size": "~3GB",
+        "gated": False,
+        "local_path": "Qwen2.5-1.5B-Instruct"
+    },
     "Qwen/Qwen2.5-3B-Instruct": {
         "name": "Qwen 2.5 3B Instruct",
         "size": "~6GB",
         "gated": False,
         "local_path": "Qwen2.5-3B-Instruct"
     },
-    "Qwen/Qwen2.5-7B-Instruct": {
-        "name": "Qwen 2.5 7B Instruct",
-        "size": "~15GB",
-        "gated": False,
-        "local_path": "Qwen2.5-7B-Instruct"
-    }
 }
 
 # Path to models directory (go up from backend/app/api/ to project root)
@@ -87,7 +97,7 @@ download_progress = {}
 active_model = None  # Will be detected from filesystem
 
 def check_model_downloaded(model_id: str) -> bool:
-    """Check if a model is downloaded locally."""
+    """Check if a model is fully downloaded locally (not just started)."""
     if model_id not in AVAILABLE_MODELS:
         return False
     
@@ -95,8 +105,56 @@ def check_model_downloaded(model_id: str) -> bool:
     local_path = AVAILABLE_MODELS[model_id]["local_path"]
     model_dir = MODELS_DIR / local_path
     
-    # A model is considered downloaded if the directory exists and has a config.json
-    return model_dir.exists() and (model_dir / "config.json").exists()
+    # Basic check: directory and config must exist
+    if not model_dir.exists() or not (model_dir / "config.json").exists():
+        return False
+    
+    # Check for model weight files (.safetensors or .bin)
+    safetensors_files = list(model_dir.glob("*.safetensors"))
+    bin_files = list(model_dir.glob("*.bin"))
+    
+    # Model must have at least one weight file
+    if not safetensors_files and not bin_files:
+        return False
+    
+    # Check if there's an incomplete download in progress (.cache with .incomplete files)
+    cache_dir = model_dir / ".cache" / "huggingface" / "download"
+    if cache_dir.exists():
+        incomplete_files = list(cache_dir.glob("*.incomplete"))
+        if incomplete_files:
+            # Download is still in progress
+            return False
+    
+    return True
+
+
+def check_model_download_in_progress(model_id: str) -> bool:
+    """Check if a model download is currently in progress."""
+    if model_id not in AVAILABLE_MODELS:
+        return False
+    
+    local_path = AVAILABLE_MODELS[model_id]["local_path"]
+    model_dir = MODELS_DIR / local_path
+    
+    # Check if directory exists but download is incomplete
+    if not model_dir.exists():
+        return False
+    
+    # Check for .incomplete files in cache
+    cache_dir = model_dir / ".cache" / "huggingface" / "download"
+    if cache_dir.exists():
+        incomplete_files = list(cache_dir.glob("*.incomplete"))
+        if incomplete_files:
+            return True
+    
+    # Check if config exists but no weight files yet
+    if (model_dir / "config.json").exists():
+        safetensors_files = list(model_dir.glob("*.safetensors"))
+        bin_files = list(model_dir.glob("*.bin"))
+        if not safetensors_files and not bin_files:
+            return True
+    
+    return False
 
 def get_downloaded_models() -> List[str]:
     """Get list of downloaded models."""
@@ -155,10 +213,14 @@ async def get_models() -> Dict[str, Any]:
     downloaded_models = get_downloaded_models()
     
     for model_id, config in AVAILABLE_MODELS.items():
+        is_downloaded = model_id in downloaded_models
+        is_downloading = check_model_download_in_progress(model_id) or model_id in download_progress
+        
         models.append(ModelInfo(
             id=model_id,
             name=config["name"],
-            downloaded=model_id in downloaded_models,
+            downloaded=is_downloaded,
+            downloading=is_downloading,
             active=model_id == active_model,
             size=config["size"],
             gated=config["gated"]
@@ -331,8 +393,18 @@ async def set_active_model(request: ModelSetActiveRequest) -> Dict[str, Any]:
     if model_id not in AVAILABLE_MODELS:
         raise HTTPException(status_code=400, detail="Model not available")
     
+    # Check if download is in progress
+    if check_model_download_in_progress(model_id) or model_id in download_progress:
+        raise HTTPException(
+            status_code=400, 
+            detail="Model download is still in progress. Please wait for it to complete."
+        )
+    
     if not check_model_downloaded(model_id):
-        raise HTTPException(status_code=400, detail="Model not downloaded")
+        raise HTTPException(
+            status_code=400, 
+            detail="Model is not fully downloaded. Please download it first."
+        )
     
     # Update active model
     old_model = active_model
@@ -348,27 +420,88 @@ async def set_active_model(request: ModelSetActiveRequest) -> Dict[str, Any]:
         stop_cmd = ["pkill", "-f", "vllm.entrypoints.openai.api_server"]
         subprocess.run(stop_cmd, check=False)
         
-        # Wait a moment for process to stop
-        await asyncio.sleep(2)
+        # Wait for process to stop
+        await asyncio.sleep(3)
         
-        # Start vLLM with new model in background
+        # Start vLLM with new model
         print(f"Starting vLLM with model: {model_path}")
-        vllm_cmd = [
-            "tmux", "send-keys", "-t", "rag-tool:vllm",
-            f"cd ~/Workshops/workshop-ragV2 && source backend/.venv/bin/activate && backend/.venv/bin/python -m vllm.entrypoints.openai.api_server --model {model_path} --host 0.0.0.0 --port 8001 --api-key dummy",
-            "Enter"
-        ]
-        subprocess.Popen(vllm_cmd)
         
+        # Get the project root and venv python path
+        project_root = Path(__file__).parent.parent.parent.parent
+        venv_python = project_root / "backend" / ".venv" / "bin" / "python"
+        
+        # Log file for vLLM output
+        log_file = project_root / "vllm.log"
+        
+        vllm_cmd = [
+            str(venv_python), "-m", "vllm.entrypoints.openai.api_server",
+            "--model", str(model_path),
+            "--port", "8001",
+            "--max-model-len", "8192",
+            "--dtype", "auto",
+            "--api-key", "dummy"
+        ]
+        
+        print(f"vLLM command: {' '.join(vllm_cmd)}")
+        
+        # Start in background with logging
+        with open(log_file, "w") as f:
+            subprocess.Popen(
+                vllm_cmd,
+                stdout=f,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                cwd=str(project_root)
+            )
+        
+        print(f"vLLM process started, logging to {log_file}")
+        
+        # Start background task to wait for vLLM (don't block the response)
+        asyncio.create_task(_wait_for_vllm(model_id))
+        
+        # Return immediately - the frontend will poll or retry
         return {
-            "message": f"Model {model_id} set as active. vLLM is restarting with the new model.",
-            "note": "vLLM will take 10-30 seconds to load the model. Please wait before making LLM requests."
+            "status": "loading",
+            "message": f"Model {model_id} is being loaded. This may take 30-120 seconds for large models.",
+            "model_name": AVAILABLE_MODELS[model_id]["name"]
         }
+        
     except Exception as e:
         # Rollback on error
         active_model = old_model
         print(f"Error restarting vLLM: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to restart vLLM: {str(e)}")
+
+
+async def _wait_for_vllm(model_id: str):
+    """Background task to wait for vLLM to be ready (for logging purposes)."""
+    import aiohttp
+    max_wait = 180
+    poll_interval = 5
+    waited = 0
+    
+    print(f"Background: Waiting for vLLM to load {model_id}...")
+    
+    while waited < max_wait:
+        await asyncio.sleep(poll_interval)
+        waited += poll_interval
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {"Authorization": "Bearer dummy"}
+                async with session.get(
+                    "http://localhost:8001/v1/models", 
+                    timeout=aiohttp.ClientTimeout(total=5),
+                    headers=headers
+                ) as resp:
+                    if resp.status == 200:
+                        print(f"Background: vLLM ready after {waited} seconds for {model_id}")
+                        return
+        except Exception:
+            print(f"Background: Still waiting for vLLM... ({waited}s)")
+            continue
+    
+    print(f"Background: vLLM did not respond within {max_wait} seconds for {model_id}")
 
 @router.post("/delete")
 async def delete_model(request: ModelDeleteRequest) -> Dict[str, Any]:
@@ -422,6 +555,30 @@ async def delete_model(request: ModelDeleteRequest) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error deleting model: {e}")
         raise HTTPException(status_code=500, detail=f"Error deleting model: {str(e)}")
+
+
+@router.get("/vllm-status")
+async def get_vllm_status() -> Dict[str, Any]:
+    """Check if vLLM is ready to serve requests"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            headers = {"Authorization": "Bearer dummy"}
+            async with session.get(
+                "http://localhost:8001/v1/models", 
+                timeout=aiohttp.ClientTimeout(total=3),
+                headers=headers
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return {
+                        "status": "ready",
+                        "models": data.get("data", [])
+                    }
+                else:
+                    return {"status": "loading"}
+    except Exception:
+        return {"status": "loading"}
+
 
 @router.get("/active")
 async def get_active_model() -> Dict[str, Any]:

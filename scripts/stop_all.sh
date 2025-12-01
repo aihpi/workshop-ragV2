@@ -29,6 +29,13 @@ if command -v docker &> /dev/null; then
         docker stop qdrant 2>/dev/null || true
         echo "✓ Qdrant stopped (container preserved for data persistence)"
     fi
+    
+    # Stop Neo4j (note: we don't remove it to preserve graph data)
+    if docker ps -q -f name=^neo4j$ &>/dev/null; then
+        echo "Stopping Neo4j container..."
+        docker stop neo4j 2>/dev/null || true
+        echo "✓ Neo4j stopped (graph data preserved in ./neo4j_data)"
+    fi
 fi
 
 echo "✓ All services stopped"

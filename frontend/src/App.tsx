@@ -292,8 +292,8 @@ Answer:`,
       setCurrentSessionId(sessionId);
       
       // Build message list from history
-      // If a message has versions, only show it (not the messages after it)
-      // The messages after it are stored in messagesPerVersion and shown via navigation
+      // When a message has versions, we show it with version controls
+      // and append the subsequent messages from the first (original) version
       const messages: any[] = [];
       
       for (let i = 0; i < history.length; i++) {
@@ -301,7 +301,7 @@ Answer:`,
         
         // Add user query
         messages.push({
-          id: `${msg.timestamp}-user`,
+          id: `${msg.timestamp}-user-${i}`,
           type: 'user' as const,
           content: msg.query,
           timestamp: new Date(msg.timestamp),
@@ -309,7 +309,7 @@ Answer:`,
         
         // Add assistant response
         const assistantMsg: any = {
-          id: `${msg.timestamp}-assistant`,
+          id: `${msg.timestamp}-assistant-${i}`,
           type: 'assistant' as const,
           content: msg.answer,
           chunks: msg.chunks,
@@ -317,36 +317,57 @@ Answer:`,
         };
         
         // Restore version information if it exists
-        if (msg.versions) {
+        if (msg.versions && msg.versions.length > 1) {
           assistantMsg.versions = msg.versions;
           assistantMsg.versionsChunks = msg.versions_chunks || [];
-          assistantMsg.currentVersionIndex = msg.versions.length - 1; // Default to latest version
+          // Default to first (original) version to show subsequent messages
+          assistantMsg.currentVersionIndex = 0;
+          // Update content to show the first version
+          assistantMsg.content = msg.versions[0];
+          assistantMsg.chunks = msg.versions_chunks?.[0] || msg.chunks;
           
           // Convert message snapshots from plain objects back to Message format
-          if (msg.messages_per_version) {
+          if (msg.messages_per_version && msg.messages_per_version.length > 0) {
+            console.log('Converting messages_per_version:', JSON.stringify(msg.messages_per_version, null, 2));
             assistantMsg.messagesPerVersion = msg.messages_per_version.map(
-              (versionMessages: any[]) => versionMessages.map((snapMsg: any) => {
-                const msgType = snapMsg.query ? 'user' : 'assistant';
-                return {
-                  id: snapMsg.timestamp ? `${snapMsg.timestamp}-${msgType}` : `snap-${Math.random()}`,
-                  type: msgType as 'user' | 'assistant',
-                  content: snapMsg.query || snapMsg.answer || '',
+              (versionMessages: any[], vIdx: number) => versionMessages.map((snapMsg: any, snapIdx: number) => {
+                // Each message from messages_per_version contains {query, answer, chunks, timestamp}
+                // We need to convert these to two messages (user + assistant)
+                const msgList: any[] = [];
+                
+                // User message
+                msgList.push({
+                  id: `snap-${vIdx}-${snapIdx}-user`,
+                  type: 'user' as 'user' | 'assistant',
+                  content: snapMsg.query || '',
+                  timestamp: new Date(snapMsg.timestamp || Date.now()),
+                });
+                
+                // Assistant message
+                msgList.push({
+                  id: `snap-${vIdx}-${snapIdx}-assistant`,
+                  type: 'assistant' as 'user' | 'assistant',
+                  content: snapMsg.answer || '',
                   chunks: snapMsg.chunks || [],
                   timestamp: new Date(snapMsg.timestamp || Date.now()),
-                };
-              })
+                });
+                
+                return msgList;
+              }).flat()
             );
+            console.log('Converted messagesPerVersion:', assistantMsg.messagesPerVersion);
           } else {
-            assistantMsg.messagesPerVersion = [];
+            assistantMsg.messagesPerVersion = msg.versions.map(() => []);
           }
           
-          // For the latest version, add the messages from the snapshot
-          const latestVersionIndex = msg.versions.length - 1;
-          const messagesForLatestVersion = assistantMsg.messagesPerVersion[latestVersionIndex] || [];
           messages.push(assistantMsg);
-          messages.push(...messagesForLatestVersion);
           
-          // Skip the rest since this message controls what comes after
+          // Add subsequent messages from the first version (since currentVersionIndex = 0)
+          const subsequentMsgs = assistantMsg.messagesPerVersion[0] || [];
+          console.log('Adding subsequent messages from version 0:', subsequentMsgs);
+          messages.push(...subsequentMsgs);
+          
+          // Skip remaining history items since they're included in messagesPerVersion
           break;
         } else {
           messages.push(assistantMsg);

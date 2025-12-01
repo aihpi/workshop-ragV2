@@ -57,12 +57,6 @@ AVAILABLE_MODELS = {
         "gated": False,
         "local_path": "Mistral-7B-Instruct-v0.3"
     },
-    "mistralai/Mistral-Nemo-Instruct-2407": {
-        "name": "Mistral Nemo 12B Instruct",
-        "size": "~12GB",
-        "gated": False,
-        "local_path": "Mistral-Nemo-Instruct-2407"
-    },
     "microsoft/Phi-3.5-mini-instruct": {
         "name": "Phi 3.5 Mini Instruct (3.8B)",
         "size": "~8GB",

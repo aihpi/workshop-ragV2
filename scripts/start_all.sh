@@ -49,6 +49,34 @@ tmux kill-session -t $SESSION 2>/dev/null || true
 echo "Starting services in tmux session '$SESSION'..."
 echo ""
 
+# Start Neo4j container (for Graph RAG)
+echo "Starting Neo4j..."
+if command -v docker &> /dev/null; then
+    # Create neo4j_data directory if it doesn't exist (for persistence)
+    mkdir -p neo4j_data neo4j_plugins
+    
+    # Check if container exists
+    if docker ps -a -q -f name=^neo4j$ &>/dev/null; then
+        # Container exists, start it
+        docker start neo4j 2>/dev/null || true
+    else
+        # Create new container
+        docker run -d \
+            --name neo4j \
+            -p 7474:7474 \
+            -p 7687:7687 \
+            -v "$(pwd)/neo4j_data:/data" \
+            -v "$(pwd)/neo4j_plugins:/plugins" \
+            -e NEO4J_AUTH=neo4j/neo4jpassword \
+            -e NEO4J_PLUGINS='["apoc"]' \
+            --restart unless-stopped \
+            neo4j:5-community
+    fi
+    echo "✓ Neo4j started (data persisted in ./neo4j_data)"
+else
+    echo "⚠ Docker not found, skipping Neo4j (Graph RAG features disabled)"
+fi
+
 # Create new session with Qdrant
 tmux new-session -d -s $SESSION -n qdrant
 tmux send-keys -t $SESSION:qdrant "./scripts/start_qdrant.sh" C-m

@@ -528,15 +528,18 @@ async def query_rag_stream(
                 full_answer += token
                 yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
             
+            # Clean the full answer before saving
+            cleaned_answer = llm_service.clean_response(full_answer)
+            
             # Send completion
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
             
-            # Save to chat history if requested
+            # Save to chat history if requested (with cleaned answer)
             if use_chat_history and chat_id:
                 chat_manager.add_message(
                     session_id=chat_id,
                     query=query,
-                    answer=full_answer,
+                    answer=cleaned_answer,
                     chunks=chunks,
                 )
         

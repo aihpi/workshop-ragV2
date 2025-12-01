@@ -242,22 +242,35 @@ const RAGChat: React.FC<RAGChatProps> = ({
                           if (currentIdx > 0) {
                             const newIdx = currentIdx - 1;
                             
+                            console.log('=== VERSION SWITCH: PREVIOUS ===');
+                            console.log('From version', currentIdx, 'to version', newIdx);
+                            console.log('message.messagesPerVersion:', message.messagesPerVersion);
+                            
                             // Get the complete message list for the previous version
                             const messagesForVersion = message.messagesPerVersion?.[newIdx] || [];
+                            console.log('messagesForVersion[' + newIdx + ']:', messagesForVersion);
                             
+                            // Create updated message, preserving all version data
                             const updatedMessage = { 
                               ...message, 
                               content: message.versions![newIdx], 
                               chunks: message.versionsChunks?.[newIdx] || [],
-                              currentVersionIndex: newIdx 
+                              currentVersionIndex: newIdx,
+                              // Explicitly preserve version data
+                              versions: message.versions,
+                              versionsChunks: message.versionsChunks,
+                              messagesPerVersion: message.messagesPerVersion,
                             };
                             
-                            // Replace entire message list with the snapshot for this version
+                            // Find message index in current messages array
                             const messageIndex = messages.findIndex(m => m.id === message.id);
+                            console.log('messageIndex:', messageIndex, 'message.id:', message.id);
                             if (messageIndex === -1) {
                               console.error('Message not found in array');
                               return;
                             }
+                            
+                            console.log('messages.slice(0, messageIndex):', messages.slice(0, messageIndex));
                             
                             // Reconstruct: messages before this response + updated response + messages from version snapshot
                             const newMessages = [
@@ -266,6 +279,7 @@ const RAGChat: React.FC<RAGChatProps> = ({
                               ...messagesForVersion
                             ];
                             
+                            console.log('newMessages:', newMessages);
                             updateState({ messages: newMessages });
                           }
                         }}
@@ -316,11 +330,16 @@ const RAGChat: React.FC<RAGChatProps> = ({
                             // Get the complete message list for the next version
                             const messagesForVersion = message.messagesPerVersion?.[newIdx] || [];
                             
+                            // Create updated message, preserving all version data
                             const updatedMessage = { 
                               ...message, 
                               content: message.versions![newIdx], 
                               chunks: message.versionsChunks?.[newIdx] || [],
-                              currentVersionIndex: newIdx 
+                              currentVersionIndex: newIdx,
+                              // Explicitly preserve version data
+                              versions: message.versions,
+                              versionsChunks: message.versionsChunks,
+                              messagesPerVersion: message.messagesPerVersion,
                             };
                             
                             // Reconstruct: messages before this response + updated response + messages from version snapshot
@@ -330,6 +349,7 @@ const RAGChat: React.FC<RAGChatProps> = ({
                               ...messagesForVersion
                             ];
                             
+                            console.log('Switching to version', newIdx, 'messagesForVersion:', messagesForVersion);
                             updateState({ messages: newMessages });
                           }
                         }}

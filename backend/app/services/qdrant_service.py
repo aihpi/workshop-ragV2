@@ -176,13 +176,22 @@ class QdrantService:
         # Group by document_id
         documents = {}
         for point in scroll_result[0]:
-            doc_id = point.payload["document_id"]
+            doc_id = point.payload.get("document_id", "unknown")
             if doc_id not in documents:
+                # Get filename and extract file_type if not present
+                filename = point.payload.get("filename", "unknown")
+                file_type = point.payload.get("file_type")
+                if not file_type and filename:
+                    # Extract extension from filename
+                    import os
+                    _, ext = os.path.splitext(filename)
+                    file_type = ext if ext else "unknown"
+                
                 documents[doc_id] = {
                     "document_id": doc_id,
-                    "filename": point.payload["filename"],
-                    "file_type": point.payload["file_type"],
-                    "upload_date": point.payload["upload_date"],
+                    "filename": filename,
+                    "file_type": file_type or "unknown",
+                    "upload_date": point.payload.get("upload_date", "1970-01-01T00:00:00"),
                     "num_chunks": 0,
                 }
             documents[doc_id]["num_chunks"] += 1

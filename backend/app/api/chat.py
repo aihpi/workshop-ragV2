@@ -49,13 +49,13 @@ async def list_sessions() -> Dict[str, List[Dict]]:
 
 @router.get("/{session_id}")
 async def get_session_history(session_id: str) -> Dict[str, List[Dict]]:
-    """Get chat history for a session.
+    """Get chat history for a session (legacy format for compatibility).
     
     Args:
         session_id: Chat session ID
         
     Returns:
-        Chat history
+        Chat history in legacy format
     """
     try:
         if not chat_manager.session_exists(session_id):
@@ -67,6 +67,50 @@ async def get_session_history(session_id: str) -> Dict[str, List[Dict]]:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting history: {str(e)}")
+
+
+@router.get("/{session_id}/full")
+async def get_full_session_history(session_id: str) -> Dict:
+    """Get full chat history with all versions and nodes.
+    
+    Args:
+        session_id: Chat session ID
+        
+    Returns:
+        Complete chat history with versions and nodes
+    """
+    try:
+        if not chat_manager.session_exists(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        full_history = chat_manager.get_full_history(session_id)
+        return full_history
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting full history: {str(e)}")
+
+
+@router.get("/{session_id}/versions")
+async def get_session_versions(session_id: str) -> Dict[str, List[Dict]]:
+    """Get list of versions for a session.
+    
+    Args:
+        session_id: Chat session ID
+        
+    Returns:
+        List of version summaries
+    """
+    try:
+        if not chat_manager.session_exists(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        versions = chat_manager.get_version_list(session_id)
+        return {"versions": versions}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting versions: {str(e)}")
 
 
 @router.delete("/{session_id}")

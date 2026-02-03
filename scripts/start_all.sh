@@ -12,14 +12,16 @@ if [ ! -d "backend/.venv" ]; then
     exit 1
 fi
 
-# Check if model exists (check for Qwen model first, then Llama)
-if [ ! -d "models/Qwen2.5-3B-Instruct" ] && [ ! -d "models/Qwen2.5-0.5B-Instruct" ] && [ ! -d "models/Llama-3.2-3B-Instruct" ]; then
-    echo "Warning: Model not found. Run ./scripts/download_model.sh"
-    read -p "Continue anyway? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
+# Check if Ollama is installed
+if ! command -v ollama &> /dev/null; then
+    echo "Error: Ollama is not installed."
+    echo ""
+    echo "Install Ollama:"
+    echo "  Linux: curl -fsSL https://ollama.com/install.sh | sh"
+    echo "  macOS: brew install ollama"
+    echo ""
+    echo "Or download from: https://ollama.com/download"
+    exit 1
 fi
 
 # Check if services are already running
@@ -49,32 +51,18 @@ tmux kill-session -t $SESSION 2>/dev/null || true
 echo "Starting services in tmux session '$SESSION'..."
 echo ""
 
-# Start Neo4j container (for Graph RAG)
-echo "Starting Neo4j..."
-if command -v docker &> /dev/null; then
-    # Create neo4j_data directory if it doesn't exist (for persistence)
-    mkdir -p neo4j_data neo4j_plugins
-    
-    # Check if container exists
-    if docker ps -a -q -f name=^neo4j$ &>/dev/null; then
-        # Container exists, start it
-        docker start neo4j 2>/dev/null || true
-    else
-        # Create new container
-        docker run -d \
-            --name neo4j \
-            -p 7474:7474 \
-            -p 7687:7687 \
-            -v "$(pwd)/neo4j_data:/data" \
-            -v "$(pwd)/neo4j_plugins:/plugins" \
-            -e NEO4J_AUTH=neo4j/neo4jpassword \
-            -e NEO4J_PLUGINS='["apoc"]' \
-            --restart unless-stopped \
-            neo4j:5-community
-    fi
-    echo "✓ Neo4j started (data persisted in ./neo4j_data)"
+# Start Ollama if not already running
+echo "Starting Ollama..."
+if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+    echo "✓ Ollama is already running"
 else
-    echo "⚠ Docker not found, skipping Neo4j (Graph RAG features disabled)"
+    ollama serve &
+    sleep 3
+    if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+        echo "✓ Ollama started"
+    else
+        echo "⚠ Warning: Ollama may not be ready yet"
+    fi
 fi
 
 # Create new session with Qdrant
@@ -83,13 +71,6 @@ tmux send-keys -t $SESSION:qdrant "./scripts/start_qdrant.sh" C-m
 
 # Wait a bit for Qdrant to start
 sleep 2
-
-# Create window for vLLM
-tmux new-window -t $SESSION -n vllm
-tmux send-keys -t $SESSION:vllm "./scripts/start_vllm.sh" C-m
-
-# Wait for vLLM to start
-sleep 5
 
 # Create window for backend
 tmux new-window -t $SESSION -n backend
@@ -101,7 +82,7 @@ echo "To view services:"
 echo "  tmux attach -t $SESSION"
 echo ""
 echo "To switch between windows in tmux:"
-echo "  Ctrl+b then 0, 1, 2 (for different windows)"
+echo "  Ctrl+b then 0, 1 (for different windows)"
 echo ""
 echo "To detach from tmux:"
 echo "  Ctrl+b then d"
@@ -110,7 +91,7 @@ echo "To stop all services:"
 echo "  ./scripts/stop_all.sh"
 echo ""
 echo "Services:"
+echo "  - Ollama: http://localhost:11434"
 echo "  - Qdrant: http://localhost:6333"
-echo "  - vLLM: http://localhost:8001"
 echo "  - Backend: http://localhost:8000"
 echo "  - API Docs: http://localhost:8000/docs"

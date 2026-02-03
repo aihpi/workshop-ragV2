@@ -30,7 +30,7 @@ fi
 # Check if vLLM is installed
 if ! $PYTHON_VENV -c "import vllm" 2>/dev/null; then
     echo "Error: vLLM not installed in virtual environment"
-    echo "Install with: cd backend && .venv/bin/pip install vllm"
+    echo "Install with: cd backend && uv pip install vllm"
     exit 1
 fi
 

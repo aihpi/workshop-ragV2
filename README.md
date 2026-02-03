@@ -1,6 +1,6 @@
 # RAG Tool - Retrieval-Augmented Generation
 
-An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backend, React frontend, Qdrant vector database, and vLLM for inference.
+An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backend, React frontend, Qdrant vector database, and Ollama for inference.
 
 ![Logo](img/logo_aisc_bmftr.jpg)
 
@@ -11,7 +11,7 @@ An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backen
 - **RAG Query**: Answer questions based on document content
 - **Streaming Responses**: Real-time token streaming using Server-Sent Events
 - **Chat History**: Persistent chat sessions with conversation context
-- **Multiple Interfaces**: Web UI with 6 specialized tabs
+- **Multiple Interfaces**: Web UI with specialized settings
 - **Flexible Deployment**: Docker or native installation
 
 ## Architecture
@@ -25,9 +25,9 @@ An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backen
                            │
                            ▼
                     ┌──────────────┐
-                    │     vLLM     │
-                    │ (Llama 3.2)  │
-                    │  Port 8001   │
+                    │    Ollama    │
+                    │   (Qwen)     │
+                    │  Port 11434  │
                     └──────────────┘
 ```
 
@@ -35,15 +35,44 @@ An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backen
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 18+
-- Docker (optional, for containerized deployment)
+- **Ollama** (required): Install from https://ollama.com
+  ```bash
+  # Linux
+  curl -fsSL https://ollama.com/install.sh | sh
+  
+  # macOS
+  brew install ollama
+  ```
+- Python 3.10+ (for native installation)
+- Node.js 18+ (for native installation)
+- Docker (for containerized deployment)
 - 16GB+ RAM recommended
-- GPU recommended (for vLLM)
 
 ### Installation
 
-#### Method 1: Automated Setup (Recommended)
+#### Method 1: Docker (Recommended)
+
+Pull pre-built images from GitHub Container Registry:
+
+```bash
+# Start Ollama on host
+ollama serve &
+ollama pull qwen2.5:7b-instruct
+
+# Clone repository
+git clone https://github.com/aihpi/workshop-ragV2.git
+cd workshop-ragV2
+
+# Start with Docker Compose
+docker-compose up -d
+```
+
+Visit http://localhost:3000
+
+> **Note**: The backend container connects to Ollama running on your host machine.
+> Ollama must be running before starting the containers.
+
+#### Method 2: Automated Setup
 
 ```bash
 # Clone/navigate to repository
@@ -66,11 +95,14 @@ cd backend
 source .venv/bin/activate
 ```
 
-**2. Download Model**
+**2. Install Ollama and Download Model**
 
 ```bash
-cd ..
-./scripts/download_model.sh
+# Install Ollama (Linux)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull the default model
+ollama pull qwen2.5:7b-instruct
 ```
 
 **3. Start Services**
@@ -80,9 +112,9 @@ Terminal 1 - Qdrant:
 ./scripts/start_qdrant.sh
 ```
 
-Terminal 2 - vLLM:
+Terminal 2 - Ollama:
 ```bash
-./scripts/start_vllm.sh
+ollama serve
 ```
 
 Terminal 3 - Backend:
@@ -132,8 +164,10 @@ Visit http://localhost:3000
 Edit `backend/.env`:
 
 ```bash
-# LLM Settings
-LLM_MODEL=meta-llama/Llama-3.2-3B-Instruct
+# Ollama Settings
+OLLAMA_HOST=localhost
+OLLAMA_PORT=11434
+OLLAMA_MODEL=qwen2.5:7b-instruct
 LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=512
 
@@ -237,31 +271,52 @@ npm run type-check
 
 ### Backend won't start
 - Check if Qdrant is running: `curl http://localhost:6333`
-- Check if vLLM is running: `curl http://localhost:8001/v1/models`
+- Check if Ollama is running: `curl http://localhost:11434/api/tags`
 - Verify `.env` configuration
 
 ### Model download fails
-- Login to HuggingFace: `huggingface-cli login`
-- Check disk space (need ~6.5GB)
+- Check disk space
 - Verify internet connection
+- Try: `ollama pull qwen2.5:7b-instruct`
 
 ### Out of memory
-- Reduce `MAX_MODEL_LEN` in vLLM config
-- Use smaller batch sizes
-- Consider using CPU-only mode
+- Use a smaller model: `ollama pull qwen2.5:3b-instruct`
+- Reduce `LLM_MAX_TOKENS` in configuration
+- Close other memory-intensive applications
 
 ### Slow inference
-- Enable GPU support for vLLM
+- Ensure Ollama is using GPU (check with `ollama ps`)
 - Reduce `LLM_MAX_TOKENS`
-- Use tensor parallelism for multi-GPU
+- Use a smaller/faster model
 
 ## Technical Details
 
 - **Embedding Model**: all-MiniLM-L6-v2 (384 dimensions)
-- **LLM**: Llama 3.2 3B Instruct (8-bit quantization)
+- **LLM**: Qwen 2.5 7B Instruct (via Ollama)
 - **Chunking**: 512 tokens with 128 token overlap
 - **Vector Distance**: Cosine similarity
-- **Context Window**: 8192 tokens
+- **LLM Backend**: Ollama (port 11434)
+
+## Docker Images
+
+Pre-built images are available on GitHub Container Registry:
+
+```bash
+# Pull images
+docker pull ghcr.io/aihpi/workshop-ragv2-backend:latest
+docker pull ghcr.io/aihpi/workshop-ragv2-frontend:latest
+
+# Or use docker-compose (automatically pulls)
+docker-compose pull
+docker-compose up -d
+```
+
+### Building Locally
+
+```bash
+docker-compose build
+docker-compose up -d
+```
 
 ## License
 

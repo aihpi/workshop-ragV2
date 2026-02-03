@@ -84,8 +84,6 @@ function App() {
   const [chatHistoryEnabled, setChatHistoryEnabled] = useState(true);
   const [ragEnabled, setRagEnabled] = useState(true);
   const [retrievalModeEnabled, setRetrievalModeEnabled] = useState(false);
-  const [graphRagEnabled, setGraphRagEnabled] = useState(false);
-  const [graphRagStrategy, setGraphRagStrategy] = useState<'none' | 'merge' | 'pre_filter' | 'post_enrich'>('merge');
   
   // Chat session state
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -157,10 +155,10 @@ Answer:`,
     currentAnswer: '',
     enableChatHistory: true,
     maxTokens: 300,
-    relevanceThreshold: 0.7,
+    relevanceThreshold: 0.0,
     topN: 5,
     topK: 40,
-    temperature: 0.3,
+    temperature: 0.7,
     topP: 0.9,
   });
 
@@ -448,10 +446,6 @@ Answer:`,
             onRagToggle={setRagEnabled}
             retrievalModeEnabled={retrievalModeEnabled}
             onRetrievalModeToggle={setRetrievalModeEnabled}
-            graphRagEnabled={graphRagEnabled}
-            onGraphRagToggle={setGraphRagEnabled}
-            graphRagStrategy={graphRagStrategy}
-            onGraphRagStrategyChange={setGraphRagStrategy}
             chatSessions={chatSessions}
             currentSessionId={currentSessionId}
             onSelectSession={handleSelectSession}
@@ -480,8 +474,6 @@ Answer:`,
                 setChatState={setRagChatState}
                 currentSessionId={currentSessionId}
                 onMessageSent={refreshSessions}
-                graphRagEnabled={graphRagEnabled}
-                graphRagStrategy={graphRagEnabled ? graphRagStrategy : 'none'}
               />
             ) : (
               // LLM Chat View (RAG disabled)

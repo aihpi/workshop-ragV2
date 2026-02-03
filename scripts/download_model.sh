@@ -38,7 +38,7 @@ echo ""
 # Check if huggingface-cli is available
 if ! command -v huggingface-cli &> /dev/null; then
     echo "Installing huggingface-hub..."
-    pip install huggingface-hub[cli]
+    uv pip install huggingface-hub[cli]
 fi
 
 # Download model

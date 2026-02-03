@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   qdrant:
     image: qdrant/qdrant:latest
@@ -8,30 +6,11 @@ services:
     volumes:
       - ./qdrant_storage:/qdrant/storage
     restart: unless-stopped
-
-  vllm:
-    image: vllm/vllm-openai:latest
-    ports:
-      - "8001:8001"
-    volumes:
-      - ./models:/models
-    command:
-      - --model
-      - /models/Llama-3.2-3B-Instruct
-      - --port
-      - "8001"
-      - --max-model-len
-      - "8192"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    restart: unless-stopped
+    profiles:
+      - with-qdrant
 
   backend:
+    image: ghcr.io/aihpi/workshop-ragv2-backend:latest
     build:
       context: .
       dockerfile: Dockerfile.backend
@@ -41,31 +20,16 @@ services:
       - ./data:/app/data
       - ./chat_history:/app/chat_history
     environment:
-      - QDRANT_HOST=qdrant
-      - VLLM_HOST=vllm
-    depends_on:
-      - qdrant
-      - vllm
-      - neo4j
-    restart: unless-stopped
-
-  neo4j:
-    image: neo4j:5-community
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-    volumes:
-      - ./neo4j_data:/data
-      - ./neo4j_plugins:/plugins
-    environment:
-      - NEO4J_AUTH=neo4j/neo4jpassword
-      - NEO4J_PLUGINS=["apoc"]
-      - NEO4J_apoc_export_file_enabled=true
-      - NEO4J_apoc_import_file_enabled=true
-      - NEO4J_apoc_import_file_use__neo4j__config=true
+      - QDRANT_HOST=${QDRANT_HOST:-host.docker.internal}
+      - QDRANT_PORT=6333
+      - OLLAMA_HOST=host.docker.internal
+      - OLLAMA_PORT=11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   frontend:
+    image: ghcr.io/aihpi/workshop-ragv2-frontend:latest
     build:
       context: .
       dockerfile: Dockerfile.frontend
@@ -79,5 +43,3 @@ volumes:
   qdrant_storage:
   data:
   chat_history:
-  neo4j_data:
-  neo4j_plugins:

@@ -13,7 +13,7 @@ class EmbeddingService:
         Args:
             model_name: Name of the SentenceTransformer model
         """
-        # Force CPU usage to avoid GPU memory conflicts with vLLM
+        # Force CPU usage for embedding model
         self.model = SentenceTransformer(model_name, device='cpu')
         self.embedding_dim = self.model.get_sentence_embedding_dimension()
     

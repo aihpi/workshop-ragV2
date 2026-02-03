@@ -9,13 +9,22 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
 # Copy backend files
 COPY backend/pyproject.toml .
 COPY backend/app ./app
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e .
+# Install Python dependencies with uv
+RUN uv pip install --system -e .
+
+# Environment variables for Ollama connection
+ENV OLLAMA_HOST=localhost
+ENV OLLAMA_PORT=11434
+ENV QDRANT_HOST=localhost
+ENV QDRANT_PORT=6333
 
 # Expose port
 EXPOSE 8000

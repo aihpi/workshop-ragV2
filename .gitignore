@@ -83,5 +83,4 @@ models/
 *.safetensors
 
 # Data files
-jobs.db
-uploads/xml/
+uploads/

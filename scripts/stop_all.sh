@@ -18,8 +18,8 @@ fi
 # Kill any remaining processes
 echo "Stopping backend processes..."
 pkill -f "uvicorn app.main:app" || true
-echo "Stopping vLLM processes..."
-pkill -f "vllm.entrypoints.openai.api_server" || true
+
+# Note: We don't stop Ollama as it's a system service and may be used by other apps
 
 # Stop Docker containers if running
 if command -v docker &> /dev/null; then
@@ -29,15 +29,9 @@ if command -v docker &> /dev/null; then
         docker stop qdrant 2>/dev/null || true
         echo "✓ Qdrant stopped (container preserved for data persistence)"
     fi
-    
-    # Stop Neo4j (note: we don't remove it to preserve graph data)
-    if docker ps -q -f name=^neo4j$ &>/dev/null; then
-        echo "Stopping Neo4j container..."
-        docker stop neo4j 2>/dev/null || true
-        echo "✓ Neo4j stopped (graph data preserved in ./neo4j_data)"
-    fi
 fi
 
 echo "✓ All services stopped"
 echo ""
+echo "Note: Ollama is not stopped (it runs as a system service)"
 echo "To start services again, run: ./scripts/start_all.sh"

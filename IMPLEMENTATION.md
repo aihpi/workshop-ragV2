@@ -6,7 +6,7 @@ A complete Retrieval-Augmented Generation (RAG) system built for educational pur
 - FastAPI backend with document processing, vector search, and LLM integration
 - React + TypeScript frontend with Vite
 - Qdrant vector database for semantic search
-- vLLM inference server with Llama 3.2 3B
+- Ollama for local LLM inference (Qwen models)
 - Multiple deployment options (native, Docker)
 
 ## Implementation Status
@@ -30,7 +30,7 @@ A complete Retrieval-Augmented Generation (RAG) system built for educational pur
   - `DocumentProcessor` - Parse and chunk documents (PDF, DOCX, TXT, MD, HTML, XML)
   - `EmbeddingService` - Generate embeddings using SentenceTransformers
   - `QdrantService` - Vector database operations
-  - `LLMService` - vLLM integration with streaming support
+  - `LLMService` - Ollama integration with streaming support
   - `ChatHistoryManager` - Persistent chat sessions
 
 - **Features**:
@@ -60,9 +60,8 @@ A complete Retrieval-Augmented Generation (RAG) system built for educational pur
 
 - **Scripts**:
   - `backend/setup.sh` - Backend installation
-  - `scripts/download_model.sh` - Model download
   - `scripts/start_qdrant.sh` - Start Qdrant
-  - `scripts/start_vllm.sh` - Start vLLM
+  - `scripts/start_ollama.sh` - Start Ollama
   - `scripts/setup_all.sh` - Complete setup
   - `scripts/start_all.sh` - Start all services (tmux)
   - `scripts/stop_all.sh` - Stop all services
@@ -112,12 +111,12 @@ workshop-rag/
 ### Backend
 - **Framework**: FastAPI
 - **Python**: 3.10+
-- **Package Manager**: uv (or pip)
+- **Package Manager**: uv (recommended)
 - **Dependencies**:
   - fastapi, uvicorn (web server)
   - qdrant-client (vector DB)
   - sentence-transformers (embeddings)
-  - vllm (LLM inference)
+  - httpx (Ollama API client)
   - PyPDF2, python-docx, beautifulsoup4 (document parsing)
   - pydantic, pydantic-settings (configuration)
 
@@ -132,13 +131,13 @@ workshop-rag/
 
 ### Infrastructure
 - **Qdrant**: Vector database (port 6333)
-- **vLLM**: LLM inference server (port 8001)
+- **Ollama**: LLM inference server (port 11434)
 - **Backend**: FastAPI server (port 8000)
 - **Frontend**: Development server (port 3000)
 
 ### Models
 - **Embedding**: sentence-transformers/all-MiniLM-L6-v2 (384 dimensions)
-- **LLM**: meta-llama/Llama-3.2-3B-Instruct (8-bit quantization)
+- **LLM**: Qwen 2.5 7B Instruct (via Ollama)
 
 ### Document Processing
 - **Supported Formats**: PDF, DOCX, TXT, MD, HTML, XML
@@ -166,12 +165,13 @@ workshop-rag/
 # Backend
 cd backend && ./setup.sh && source .venv/bin/activate
 
-# Download model
-./scripts/download_model.sh
+# Install Ollama and pull model
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen2.5:7b-instruct
 
 # Start services (3 terminals)
 ./scripts/start_qdrant.sh
-./scripts/start_vllm.sh
+ollama serve
 uvicorn app.main:app --reload
 
 # Frontend (if Node.js available)
@@ -180,9 +180,6 @@ cd frontend && npm install && npm run dev
 
 ### Option 3: Docker
 ```bash
-# Download model first
-./scripts/download_model.sh
-
 # Start all services
 docker-compose up -d
 ```
@@ -198,13 +195,13 @@ docker-compose up -d
 ## Git Repository
 
 ### Commits
-1. **Initial commit**: Backend implementation with FastAPI, Qdrant, and vLLM
+1. **Initial commit**: Backend implementation with FastAPI, Qdrant, and Ollama
 2. **Complete implementation**: Frontend, Docker setup, and documentation
 
 ### Files Created: 50+
 - 18 Python backend files
 - 11 TypeScript/React frontend files
-- 6 Shell scripts
+- 5 Shell scripts
 - 3 Docker files
 - 3 README files
 - Configuration and environment files
@@ -228,11 +225,10 @@ docker-compose up -d
 
 ## Known Limitations
 
-1. **Frontend**: Requires Node.js/npm for installation (not available on system)
-2. **GPU**: vLLM requires GPU for optimal performance
-3. **Memory**: ~16GB RAM recommended for running all services
-4. **Model Size**: Llama 3.2 3B requires ~6.5GB disk space
-5. **Chat History**: Basic implementation, no search functionality
+1. **Frontend**: Requires Node.js/npm for installation
+2. **Memory**: ~16GB RAM recommended for running all services
+3. **Model Size**: Qwen models require varying disk space (1-20GB)
+4. **Chat History**: Basic implementation, no search functionality
 
 ## Performance Considerations
 
@@ -278,11 +274,11 @@ tmux attach -t rag-tool
 
 ### Updating Models
 ```bash
-# Download new model
-./scripts/download_model.sh
+# Pull new Ollama model
+ollama pull qwen2.5:14b-instruct
 
-# Update LLM_MODEL in backend/.env
-# Restart vLLM service
+# Update OLLAMA_MODEL in backend/.env
+# Restart backend service
 ```
 
 ## Conclusion
@@ -293,5 +289,6 @@ The RAG tool implementation is **complete and functional** with:
 - ✅ Docker deployment option
 - ✅ Comprehensive setup and startup scripts
 - ✅ Documentation and examples
+- ✅ Ollama-based local LLM inference with Qwen models
 
-The system is ready for testing and educational use. Frontend requires Node.js/npm for full deployment but can be tested once npm is available.
+The system is ready for testing and educational use.

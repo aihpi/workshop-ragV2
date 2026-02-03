@@ -1,7 +1,7 @@
 [project]
 name = "rag-backend"
 version = "0.1.0"
-description = "RAG Backend with FastAPI, Qdrant, and vLLM"
+description = "RAG Backend with FastAPI, Qdrant, and Ollama"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.109.0",
@@ -17,8 +17,5 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "httpx>=0.26.0",
     "aiofiles>=23.2.1",
-    "vllm>=0.11.0",
-    "neo4j>=5.14.0",
     "defusedxml>=0.7.1",
-    "aiosqlite>=0.19.0",
 ]

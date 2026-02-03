@@ -1,4 +1,4 @@
-"""Main FastAPI application with Graph RAG support."""
+"""Main FastAPI application for RAG backend."""
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,62 +10,12 @@ from app.api import api_router
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup and shutdown."""
     # Startup
-    print("Starting up RAG Backend with Graph RAG support...")
-    
-    # Initialize job persistence service
-    try:
-        from app.services.job_persistence import get_job_persistence_service
-        job_service = await get_job_persistence_service()
-        print("Job persistence service initialized")
-        
-        # Cleanup old jobs on startup
-        deleted = job_service.cleanup_old_jobs()
-        if deleted > 0:
-            print(f"Cleaned up {deleted} old job records")
-    except Exception as e:
-        print(f"Warning: Could not initialize job persistence: {e}")
-    
-    # Initialize graph service (optional)
-    try:
-        from app.services.graph_service import get_graph_service
-        graph_service = await get_graph_service()
-        print("Neo4j graph service initialized")
-    except Exception as e:
-        print(f"Note: Neo4j not available (this is optional): {e}")
-    
-    # Initialize async processor
-    try:
-        from app.services.async_processor import get_async_processor
-        processor = await get_async_processor()
-        print("Async XML processor initialized")
-    except Exception as e:
-        print(f"Warning: Could not initialize async processor: {e}")
+    print("Starting up RAG Backend...")
     
     yield
     
     # Shutdown
     print("Shutting down RAG Backend...")
-    
-    # Close async processor
-    try:
-        from app.services.async_processor import close_async_processor
-        await close_async_processor()
-    except Exception:
-        pass
-    
-    # Close graph service
-    try:
-        from app.services.graph_service import close_graph_service
-        await close_graph_service()
-    except Exception:
-        pass
-    
-    # Close job persistence
-    try:
-        from app.services.job_persistence import close_job_persistence_service
-        await close_job_persistence_service()
-    except Exception:
-        pass
 
 
 # Create FastAPI app with lifespan

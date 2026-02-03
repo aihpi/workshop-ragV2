@@ -117,9 +117,9 @@ Answer:`,
   };
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', gap: '16px' }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', gap: '16px', minWidth: 0 }}>
       {/* Left Panel - Prompt List */}
-      <div style={{ width: '300px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ width: '300px', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
@@ -233,7 +233,7 @@ Answer:`,
       </div>
 
       {/* Right Panel - Prompt Editor */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         {selectedPrompt ? (
           <>
             <div style={{ 

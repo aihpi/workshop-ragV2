@@ -46,8 +46,6 @@ interface RAGChatProps {
   setChatState: React.Dispatch<React.SetStateAction<RAGChatState>>;
   currentSessionId: string | null;
   onMessageSent?: () => void;
-  graphRagEnabled?: boolean;
-  graphRagStrategy?: 'none' | 'merge' | 'pre_filter' | 'post_enrich';
 }
 
 const RAGChat: React.FC<RAGChatProps> = ({ 
@@ -56,8 +54,6 @@ const RAGChat: React.FC<RAGChatProps> = ({
   setChatState, 
   currentSessionId, 
   onMessageSent,
-  graphRagEnabled = false,
-  graphRagStrategy = 'none',
 }) => {
   // Use persistent state from props
   const {
@@ -138,7 +134,6 @@ const RAGChat: React.FC<RAGChatProps> = ({
         use_chat_history: enableChatHistory,
         chat_id: currentSessionId || undefined,
         prompt: activePrompt?.template,
-        graph_rag_strategy: graphRagEnabled ? graphRagStrategy : 'none',
       },
       (token) => {
         finalAnswer += token;

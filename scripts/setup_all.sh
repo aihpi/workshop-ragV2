@@ -23,10 +23,18 @@ if ! command -v git &> /dev/null; then
 fi
 echo "✓ git"
 
+# Check for Ollama
+if command -v ollama &> /dev/null; then
+    echo "✓ Ollama"
+else
+    echo "⚠ Ollama not found"
+    echo "  Install with: curl -fsSL https://ollama.com/install.sh | sh"
+fi
+
 # Create directories
 echo ""
 echo "Creating directories..."
-mkdir -p data chat_history qdrant_storage models
+mkdir -p data chat_history qdrant_storage
 echo "✓ Directories created"
 
 # Setup backend
@@ -36,28 +44,46 @@ cd backend
 ./setup.sh
 cd ..
 
-# Download model
+# Download Ollama model
 echo ""
-echo "===== Downloading Model ====="
-read -p "Download Llama 3.2 3B model now? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    ./scripts/download_model.sh
+echo "===== Setting up Ollama Model ====="
+if command -v ollama &> /dev/null; then
+    echo "Available models:"
+    echo "  1) qwen2.5:7b-instruct (4.4GB) - Recommended, better quality"
+    echo "  2) qwen2.5:3b-instruct (1.8GB) - For systems with limited RAM/VRAM"
+    echo ""
+    read -p "Which model to install? (1/2/skip): " -r
+    case $REPLY in
+        1)
+            echo "Pulling qwen2.5:7b-instruct..."
+            ollama pull qwen2.5:7b-instruct
+            ;;
+        2)
+            echo "Pulling qwen2.5:3b-instruct..."
+            ollama pull qwen2.5:3b-instruct
+            echo "Note: Update OLLAMA_MODEL in backend/.env to 'qwen2.5:3b-instruct'"
+            ;;
+        *)
+            echo "Skipping model download. Run 'ollama pull qwen2.5:7b-instruct' later."
+            ;;
+    esac
 else
-    echo "Skipping model download. You can run ./scripts/download_model.sh later."
+    echo "Ollama not installed. Install it first, then run 'ollama pull qwen2.5:7b-instruct'"
 fi
 
 echo ""
 echo "===== Setup Complete ====="
 echo ""
 echo "Next steps:"
-echo "1. Start services:"
+echo "1. Make sure Ollama is running:"
+echo "   ollama serve  (or check if it's already running)"
+echo ""
+echo "2. Start all services:"
 echo "   ./scripts/start_all.sh"
 echo ""
-echo "2. Or start services manually:"
+echo "3. Or start services manually:"
 echo "   Terminal 1: ./scripts/start_qdrant.sh"
-echo "   Terminal 2: ./scripts/start_vllm.sh"
-echo "   Terminal 3: cd backend && source .venv/bin/activate && uvicorn app.main:app --reload"
+echo "   Terminal 2: cd backend && source .venv/bin/activate && uvicorn app.main:app --reload"
 echo ""
-echo "3. For Docker deployment:"
+echo "4. For Docker deployment:"
 echo "   docker-compose up -d"

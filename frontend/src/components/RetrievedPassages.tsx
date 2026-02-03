@@ -34,9 +34,9 @@ const RetrievedPassages: React.FC<RetrievedPassagesProps> = ({ ragChatState, set
   const handleResetParameters = () => {
     setRagChatState(prev => ({
       ...prev,
-      topK: 10,
+      topK: 40,
       relevanceThreshold: 0.0,
-      topN: 3,
+      topN: 5,
       maxTokens: 300,
       temperature: 0.7,
       topP: 0.9,

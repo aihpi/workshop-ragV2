@@ -21,7 +21,7 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
-pip install -e .
+uv pip install -e .
 ```
 
 ## Configuration
@@ -34,7 +34,7 @@ cp .env.example .env
 
 ## Running
 
-Make sure Qdrant and vLLM services are running, then:
+Make sure Qdrant and Ollama services are running, then:
 
 ```bash
 # Development mode with auto-reload

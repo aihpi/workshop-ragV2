@@ -15,7 +15,7 @@ const MainWindow: React.FC<MainWindowProps> = ({ children, headerContent }) => {
       height: '100vh',
       backgroundColor: theme.colors.white,
       position: 'relative',
-      margin: '0 16px',
+      margin: 0,
     }}>
       {/* Header with model management and other controls */}
       {headerContent && (

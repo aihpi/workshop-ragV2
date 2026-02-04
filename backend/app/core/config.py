@@ -1,6 +1,6 @@
 """Configuration management for the RAG backend."""
 from pydantic_settings import BaseSettings
-from typing import List, Union
+from typing import List, Union, Literal
 from pydantic import field_validator
 
 
@@ -28,9 +28,20 @@ class Settings(BaseSettings):
     QDRANT_PORT: int = 6333
     QDRANT_COLLECTION: str = "documents"
     
-    # Embedding Settings
+    # Provider Selection
+    LLM_PROVIDER: Literal["ollama", "openai"] = "ollama"
+    EMBEDDING_PROVIDER: Literal["local", "openai"] = "local"
+    
+    # Embedding Settings (local SentenceTransformers)
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
-    EMBEDDING_DIM: int = 384
+    EMBEDDING_DIM: int = 384  # Used when provider is "local"
+    
+    # OpenAI-compatible API Settings
+    OPENAI_API_KEY: str = ""
+    OPENAI_BASE_URL: str = "http://10.127.129.0:4000"
+    OPENAI_LLM_MODEL: str = "gpt-oss-120b"
+    OPENAI_EMBEDDING_MODEL: str = "octen-embedding-8b"
+    OPENAI_EMBEDDING_DIM: int = 4096  # Dimension for OpenAI embeddings
     
     # Ollama LLM Settings
     OLLAMA_HOST: str = "localhost"
@@ -50,6 +61,12 @@ class Settings(BaseSettings):
     # Chat History Settings
     CHAT_HISTORY_FOLDER: str = "../chat_history"
     MAX_CHAT_HISTORY: int = 10
+    
+    def get_embedding_dim(self) -> int:
+        """Get embedding dimension based on provider."""
+        if self.EMBEDDING_PROVIDER == "openai":
+            return self.OPENAI_EMBEDDING_DIM
+        return self.EMBEDDING_DIM
     
     class Config:
         env_file = ".env"

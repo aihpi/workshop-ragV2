@@ -6,19 +6,19 @@ from fastapi.responses import StreamingResponse
 
 from app.schemas import QueryRequest, QueryResponse, RetrievedChunk
 from app.services import (
-    EmbeddingService,
     QdrantService,
-    LLMService,
     ChatHistoryManager,
+    get_embedding_service,
+    get_llm_service,
 )
 from app.core.config import settings
 
 router = APIRouter()
 
-# Initialize services
-embedding_service = EmbeddingService(model_name=settings.EMBEDDING_MODEL)
+# Initialize services using factories
+embedding_service = get_embedding_service()
 qdrant_service = QdrantService()
-llm_service = LLMService()
+llm_service = get_llm_service()
 chat_manager = ChatHistoryManager(history_folder=settings.CHAT_HISTORY_FOLDER)
 
 

@@ -1,14 +1,16 @@
-"""LLM service using Ollama."""
+"""LLM service with provider abstraction (Ollama and OpenAI)."""
 import httpx
 import json
 import re
+from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Optional, List, Dict
 from pathlib import Path
+import openai
 from app.core.config import settings
 
 
-class LLMService:
-    """Service for interacting with Ollama inference server."""
+class BaseLLMService(ABC):
+    """Abstract base class for LLM services."""
     
     # Patterns to clean from responses
     CLEANUP_PATTERNS = [
@@ -30,15 +32,6 @@ class LLMService:
         (r'\n{3,}', '\n\n'),
     ]
     
-    # File to persist active model selection
-    ACTIVE_MODEL_FILE = Path(__file__).parent.parent.parent.parent / ".ollama_model"
-    
-    def __init__(self):
-        """Initialize LLM service for Ollama."""
-        self.base_url = f"http://{settings.OLLAMA_HOST}:{settings.OLLAMA_PORT}"
-        self.default_model = settings.OLLAMA_MODEL
-        self._cached_model: Optional[str] = None
-    
     def clean_response(self, response: str) -> str:
         """Clean up LLM response to remove meta-information and artifacts."""
         cleaned = response
@@ -54,75 +47,6 @@ class LLMService:
                 cleaned = cleaned[:last_period + 1]
         
         return cleaned
-    
-    def _load_active_model(self) -> Optional[str]:
-        """Load active model from persistence file."""
-        try:
-            if self.ACTIVE_MODEL_FILE.exists():
-                return self.ACTIVE_MODEL_FILE.read_text().strip()
-        except Exception:
-            pass
-        return None
-    
-    def _save_active_model(self, model: str) -> None:
-        """Save active model to persistence file."""
-        try:
-            self.ACTIVE_MODEL_FILE.parent.mkdir(parents=True, exist_ok=True)
-            self.ACTIVE_MODEL_FILE.write_text(model)
-        except Exception as e:
-            print(f"Error saving active model: {e}")
-    
-    async def get_active_model(self) -> str:
-        """Get the currently active model.
-        
-        Always reads from file to ensure we get the latest model
-        set by any service instance.
-        """
-        # Always try to load from file first to get latest state
-        saved = self._load_active_model()
-        if saved:
-            self._cached_model = saved
-            return saved
-        
-        # Fallback to default
-        if not self._cached_model:
-            self._cached_model = self.default_model
-        return self._cached_model
-    
-    async def set_active_model(self, model_name: str) -> None:
-        """Set the active model."""
-        self._cached_model = model_name
-        self._save_active_model(model_name)
-    
-    async def list_models(self) -> List[Dict[str, any]]:
-        """List available Ollama models."""
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{self.base_url}/api/tags")
-                if response.status_code == 200:
-                    data = response.json()
-                    return data.get("models", [])
-        except Exception as e:
-            print(f"Error listing Ollama models: {e}")
-        return []
-    
-    @classmethod
-    async def check_connection(cls) -> Dict[str, any]:
-        """Check if Ollama is available."""
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(
-                    f"http://{settings.OLLAMA_HOST}:{settings.OLLAMA_PORT}/api/tags"
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    models = [m["name"] for m in data.get("models", [])]
-                    return {"connected": True, "models": models, "error": None}
-                return {"connected": False, "models": [], "error": f"Status {response.status_code}"}
-        except httpx.ConnectError:
-            return {"connected": False, "models": [], "error": f"Cannot connect to Ollama at {settings.OLLAMA_HOST}:{settings.OLLAMA_PORT}"}
-        except Exception as e:
-            return {"connected": False, "models": [], "error": str(e)}
     
     def create_prompt(
         self,
@@ -196,8 +120,390 @@ Answer:"""
         
         return prompt
     
+    @abstractmethod
+    async def get_active_model(self) -> str:
+        """Get the currently active model."""
+        pass
+    
+    @abstractmethod
+    async def set_active_model(self, model_name: str) -> None:
+        """Set the active model."""
+        pass
+    
+    @abstractmethod
+    async def list_models(self) -> List[Dict[str, any]]:
+        """List available models."""
+        pass
+    
+    @abstractmethod
     async def generate_stream(
         self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        top_p: float = 0.9,
+        top_k: int = 40,
+    ) -> AsyncGenerator[str, None]:
+        """Generate streaming response."""
+        pass
+    
+    @abstractmethod
+    async def generate(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        top_p: float = 0.9,
+        top_k: int = 40,
+    ) -> str:
+        """Generate non-streaming response."""
+        pass
+    
+    @classmethod
+    @abstractmethod
+    async def check_connection(cls) -> Dict[str, any]:
+        """Check if the LLM provider is available."""
+        pass
+
+
+class OllamaLLMService(BaseLLMService):
+    """Service for interacting with Ollama inference server."""
+    
+    # File to persist active model selection
+    ACTIVE_MODEL_FILE = Path(__file__).parent.parent.parent.parent / ".ollama_model"
+    
+    def __init__(self):
+        """Initialize LLM service for Ollama."""
+        self.base_url = f"http://{settings.OLLAMA_HOST}:{settings.OLLAMA_PORT}"
+        self.default_model = settings.OLLAMA_MODEL
+        self._cached_model: Optional[str] = None
+    
+    def _load_active_model(self) -> Optional[str]:
+        """Load active model from persistence file."""
+        try:
+            if self.ACTIVE_MODEL_FILE.exists():
+                return self.ACTIVE_MODEL_FILE.read_text().strip()
+        except Exception:
+            pass
+        return None
+    
+    def _save_active_model(self, model: str) -> None:
+        """Save active model to persistence file."""
+        try:
+            self.ACTIVE_MODEL_FILE.parent.mkdir(parents=True, exist_ok=True)
+            self.ACTIVE_MODEL_FILE.write_text(model)
+        except Exception as e:
+            print(f"Error saving active model: {e}")
+    
+    async def get_active_model(self) -> str:
+        """Get the currently active model."""
+        saved = self._load_active_model()
+        if saved:
+            self._cached_model = saved
+            return saved
+        
+        if not self._cached_model:
+            self._cached_model = self.default_model
+        return self._cached_model
+    
+    async def set_active_model(self, model_name: str) -> None:
+        """Set the active model."""
+        self._cached_model = model_name
+        self._save_active_model(model_name)
+    
+    async def list_models(self) -> List[Dict[str, any]]:
+        """List available Ollama models."""
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{self.base_url}/api/tags")
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("models", [])
+        except Exception as e:
+            print(f"Error listing Ollama models: {e}")
+        return []
+    
+    @classmethod
+    async def check_connection(cls) -> Dict[str, any]:
+        """Check if Ollama is available."""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"http://{settings.OLLAMA_HOST}:{settings.OLLAMA_PORT}/api/tags"
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    models = [m["name"] for m in data.get("models", [])]
+                    return {"connected": True, "models": models, "error": None}
+                return {"connected": False, "models": [], "error": f"Status {response.status_code}"}
+        except httpx.ConnectError:
+            return {"connected": False, "models": [], "error": f"Cannot connect to Ollama at {settings.OLLAMA_HOST}:{settings.OLLAMA_PORT}"}
+        except Exception as e:
+            return {"connected": False, "models": [], "error": str(e)}
+    
+    async def generate_stream(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        top_p: float = 0.9,
+        top_k: int = 40,
+    ) -> AsyncGenerator[str, None]:
+        """Generate streaming response from Ollama."""
+        model = await self.get_active_model()
+        
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": True,
+            "options": {
+                "num_predict": max_tokens,
+                "temperature": temperature,
+                "top_p": top_p,
+                "top_k": top_k,
+            }
+        }
+        
+        print(f"Starting Ollama stream request to {self.base_url}/api/generate")
+        print(f"Model: {model}, max_tokens: {max_tokens}")
+        
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.base_url}/api/generate",
+                    json=payload,
+                ) as response:
+                    print(f"Response status: {response.status_code}")
+                    
+                    if response.status_code != 200:
+                        error_text = await response.aread()
+                        print(f"Error response: {error_text}")
+                        yield f"Error: Ollama returned status {response.status_code}"
+                        return
+                    
+                    line_count = 0
+                    async for line in response.aiter_lines():
+                        if line:
+                            line_count += 1
+                            try:
+                                data = json.loads(line)
+                                if "response" in data:
+                                    yield data["response"]
+                                if data.get("done", False):
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+                    
+                    print(f"Stream ended after {line_count} lines")
+                    
+        except httpx.ConnectError as e:
+            print(f"Connection error: {e}")
+            yield f"Error: Cannot connect to Ollama at {self.base_url}"
+        except Exception as e:
+            print(f"Error in Ollama stream: {e}")
+            yield f"Error: {str(e)}"
+    
+    async def generate(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        top_p: float = 0.9,
+        top_k: int = 40,
+    ) -> str:
+        """Generate non-streaming response from Ollama."""
+        model = await self.get_active_model()
+        
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "num_predict": max_tokens,
+                "temperature": temperature,
+                "top_p": top_p,
+                "top_k": top_k,
+            }
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/api/generate",
+                    json=payload,
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    raw_response = data.get("response", "")
+                    return self.clean_response(raw_response)
+                else:
+                    return f"Error: Ollama returned status {response.status_code}"
+                    
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+
+class OpenAILLMService(BaseLLMService):
+    """Service for interacting with OpenAI-compatible API."""
+    
+    # File to persist active model selection
+    ACTIVE_MODEL_FILE = Path(__file__).parent.parent.parent.parent / ".openai_model"
+    
+    def __init__(self):
+        """Initialize LLM service for OpenAI API."""
+        self.client = openai.AsyncOpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL,
+        )
+        self.default_model = settings.OPENAI_LLM_MODEL
+        self._cached_model: Optional[str] = None
+    
+    def _load_active_model(self) -> Optional[str]:
+        """Load active model from persistence file."""
+        try:
+            if self.ACTIVE_MODEL_FILE.exists():
+                return self.ACTIVE_MODEL_FILE.read_text().strip()
+        except Exception:
+            pass
+        return None
+    
+    def _save_active_model(self, model: str) -> None:
+        """Save active model to persistence file."""
+        try:
+            self.ACTIVE_MODEL_FILE.parent.mkdir(parents=True, exist_ok=True)
+            self.ACTIVE_MODEL_FILE.write_text(model)
+        except Exception as e:
+            print(f"Error saving active model: {e}")
+    
+    async def get_active_model(self) -> str:
+        """Get the currently active model."""
+        saved = self._load_active_model()
+        if saved:
+            self._cached_model = saved
+            return saved
+        
+        if not self._cached_model:
+            self._cached_model = self.default_model
+        return self._cached_model
+    
+    async def set_active_model(self, model_name: str) -> None:
+        """Set the active model."""
+        self._cached_model = model_name
+        self._save_active_model(model_name)
+    
+    async def list_models(self) -> List[Dict[str, any]]:
+        """List available models (returns configured models for OpenAI)."""
+        # Return the configured model as the available model
+        return [
+            {"name": settings.OPENAI_LLM_MODEL, "size": 0},
+        ]
+    
+    @classmethod
+    async def check_connection(cls) -> Dict[str, any]:
+        """Check if OpenAI API is available."""
+        try:
+            client = openai.AsyncOpenAI(
+                api_key=settings.OPENAI_API_KEY,
+                base_url=settings.OPENAI_BASE_URL,
+            )
+            # Try a simple completion to verify connection
+            response = await client.chat.completions.create(
+                model=settings.OPENAI_LLM_MODEL,
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=1,
+            )
+            return {
+                "connected": True,
+                "models": [settings.OPENAI_LLM_MODEL],
+                "error": None
+            }
+        except openai.AuthenticationError:
+            return {"connected": False, "models": [], "error": "Invalid API key"}
+        except openai.APIConnectionError:
+            return {"connected": False, "models": [], "error": f"Cannot connect to API at {settings.OPENAI_BASE_URL}"}
+        except Exception as e:
+            return {"connected": False, "models": [], "error": str(e)}
+    
+    async def generate_stream(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        top_p: float = 0.9,
+        top_k: int = 40,
+    ) -> AsyncGenerator[str, None]:
+        """Generate streaming response from OpenAI API."""
+        model = await self.get_active_model()
+        
+        print(f"Starting OpenAI stream request")
+        print(f"Model: {model}, max_tokens: {max_tokens}")
+        
+        try:
+            stream = await self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                stream=True,
+            )
+            
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+                    
+        except openai.APIConnectionError as e:
+            print(f"Connection error: {e}")
+            yield f"Error: Cannot connect to API at {settings.OPENAI_BASE_URL}"
+        except Exception as e:
+            print(f"Error in OpenAI stream: {e}")
+            yield f"Error: {str(e)}"
+    
+    async def generate(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        top_p: float = 0.9,
+        top_k: int = 40,
+    ) -> str:
+        """Generate non-streaming response from OpenAI API."""
+        model = await self.get_active_model()
+        
+        try:
+            response = await self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+            )
+            
+            raw_response = response.choices[0].message.content or ""
+            return self.clean_response(raw_response)
+                    
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+
+# Backward compatibility alias
+LLMService = OllamaLLMService
+
+
+def get_llm_service() -> BaseLLMService:
+    """Factory function to get the appropriate LLM service based on config."""
+    if settings.LLM_PROVIDER == "openai":
+        return OpenAILLMService()
+    return OllamaLLMService()
+
+
+def get_llm_service_class():
+    """Get the appropriate LLM service class based on config."""
+    if settings.LLM_PROVIDER == "openai":
+        return OpenAILLMService
+    return OllamaLLMService
         prompt: str,
         temperature: float = 0.7,
         max_tokens: int = 512,

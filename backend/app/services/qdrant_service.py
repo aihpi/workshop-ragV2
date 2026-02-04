@@ -54,7 +54,7 @@ class QdrantService:
             self.client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=VectorParams(
-                    size=settings.EMBEDDING_DIM,
+                    size=settings.get_embedding_dim(),
                     distance=Distance.COSINE,
                 ),
             )

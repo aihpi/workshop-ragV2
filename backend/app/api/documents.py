@@ -13,19 +13,19 @@ from app.schemas import (
 )
 from app.services import (
     DocumentProcessor,
-    EmbeddingService,
     QdrantService,
+    get_embedding_service,
 )
 from app.core.config import settings
 
 router = APIRouter()
 
-# Initialize services
+# Initialize services using factories
 doc_processor = DocumentProcessor(
     chunk_size=settings.CHUNK_SIZE,
     chunk_overlap=settings.CHUNK_OVERLAP,
 )
-embedding_service = EmbeddingService(model_name=settings.EMBEDDING_MODEL)
+embedding_service = get_embedding_service()
 qdrant_service = QdrantService()
 
 # Ensure data folder exists

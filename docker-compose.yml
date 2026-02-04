@@ -20,10 +20,25 @@ services:
       - ./data:/app/data
       - ./chat_history:/app/chat_history
     environment:
+      # Qdrant settings
       - QDRANT_HOST=${QDRANT_HOST:-host.docker.internal}
       - QDRANT_PORT=6333
-      - OLLAMA_HOST=host.docker.internal
-      - OLLAMA_PORT=11434
+      # Provider selection (ollama/openai for LLM, local/openai for embeddings)
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-local}
+      # Ollama settings (used when LLM_PROVIDER=ollama)
+      - OLLAMA_HOST=${OLLAMA_HOST:-host.docker.internal}
+      - OLLAMA_PORT=${OLLAMA_PORT:-11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+      # OpenAI-compatible API settings (used when provider=openai)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://10.127.129.0:4000}
+      - OPENAI_LLM_MODEL=${OPENAI_LLM_MODEL:-gpt-oss-120b}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-octen-embedding-8b}
+      - OPENAI_EMBEDDING_DIM=${OPENAI_EMBEDDING_DIM:-4096}
+      # Local embedding settings (used when EMBEDDING_PROVIDER=local)
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-384}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

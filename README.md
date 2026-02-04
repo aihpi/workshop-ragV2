@@ -182,11 +182,21 @@ QDRANT_PORT=6333
 
 ### Frontend Configuration
 
+For **local development** (without Docker), create a `.env` file:
+
+```bash
+cd frontend
+cp .env.example .env
+```
+
 Edit `frontend/.env`:
 
 ```bash
 VITE_API_URL=http://localhost:8000
 ```
+
+> **Note**: For Docker deployment, `.env` is not needed. The frontend uses relative
+> URLs and nginx proxies `/api` requests to the backend container.
 
 ## API Endpoints
 
@@ -314,9 +324,13 @@ docker-compose up -d
 ### Building Locally
 
 ```bash
+# Build and start containers
 docker-compose build
 docker-compose up -d
 ```
+
+> **Note**: No `.env` file is required for Docker builds. The frontend uses
+> relative URLs and nginx handles API proxying to the backend container.
 
 ## License
 

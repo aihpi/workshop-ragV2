@@ -11,9 +11,6 @@ services:
 
   backend:
     image: ghcr.io/aihpi/workshop-ragv2-backend:latest
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
     ports:
       - "8000:8000"
     volumes:
@@ -30,9 +27,6 @@ services:
 
   frontend:
     image: ghcr.io/aihpi/workshop-ragv2-frontend:latest
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
     ports:
       - "3000:3000"
     depends_on:

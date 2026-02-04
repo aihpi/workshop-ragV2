@@ -55,6 +55,9 @@ An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backen
 
 > **Windows Users**: Run all commands in **WSL/Ubuntu terminal**, not PowerShell or CMD.
 
+> **Apple Silicon (M1/M2/M3) Users**: Docker images are built for both `linux/amd64` and `linux/arm64`.
+> For optimal performance, ensure Docker Desktop is configured to use Apple Virtualization framework.
+
 ### Installation
 
 #### Method 1: Docker (Recommended)
@@ -306,6 +309,56 @@ npm run type-check
 
 ## Troubleshooting
 
+### Ollama Connection Issues (Docker)
+
+If the backend container cannot connect to Ollama running on your host:
+
+**1. Ensure Ollama listens on all interfaces:**
+
+```bash
+# Stop Ollama if running
+killall ollama
+
+# Start with OLLAMA_HOST set to bind to all interfaces
+OLLAMA_HOST=0.0.0.0 ollama serve
+```
+
+**2. Verify connectivity from container:**
+
+```bash
+# Test connection from inside the backend container
+docker exec -it workshop-ragv2-backend-1 curl http://host.docker.internal:11434/api/tags
+```
+
+**3. Check firewall settings:**
+- macOS: System Settings → Network → Firewall → Allow Ollama
+- Linux: `sudo ufw allow 11434/tcp`
+
+### Alternative: Docker Model Runner (macOS)
+
+If you're on macOS with Docker Desktop, you can use [Docker Model Runner](https://docs.docker.com/ai/model-runner/) instead of Ollama. It integrates directly with Docker Desktop and has GPU access on Apple Silicon.
+
+**1. Enable Docker Model Runner:**
+
+In Docker Desktop: Settings → Features in development → Enable "Docker Model Runner"
+
+**2. Pull a model:**
+
+```bash
+docker model pull ai/qwen2.5:7B-Q4_K_M
+```
+
+**3. Update docker-compose.yml environment:**
+
+```yaml
+environment:
+  - OLLAMA_HOST=model-runner.docker.internal
+  - OLLAMA_PORT=80
+```
+
+> **Note**: Docker Model Runner uses an OpenAI-compatible API. Basic inference should work,
+> but some Ollama-specific features may differ.
+
 ### Backend won't start
 - Check if Qdrant is running: `curl http://localhost:6333`
 - Check if Ollama is running: `curl http://localhost:11434/api/tags`
@@ -336,7 +389,7 @@ npm run type-check
 
 ## Docker Images
 
-Pre-built images are available on GitHub Container Registry:
+Pre-built multi-architecture images (`linux/amd64` and `linux/arm64`) are available on GitHub Container Registry:
 
 ```bash
 # Pull images
@@ -348,12 +401,13 @@ docker-compose pull
 docker-compose up -d
 ```
 
-### Building Locally
+### Building Locally (Development)
+
+For local development, use the dev compose override:
 
 ```bash
-# Build and start containers
-docker-compose build
-docker-compose up -d
+# Build and start containers locally
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 > **Note**: No `.env` file is required for Docker builds. The frontend uses

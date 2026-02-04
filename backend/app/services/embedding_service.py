@@ -74,7 +74,7 @@ class LocalEmbeddingService(BaseEmbeddingService):
 class OpenAIEmbeddingService(BaseEmbeddingService):
     """Service for generating embeddings using OpenAI-compatible API.
     
-    Uses chat completions API format as specified for the custom embedding endpoint.
+    Uses the standard OpenAI embeddings endpoint (/v1/embeddings).
     """
     
     def __init__(self):
@@ -86,56 +86,32 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
         self.model = settings.OPENAI_EMBEDDING_MODEL
         self.embedding_dim = settings.OPENAI_EMBEDDING_DIM
     
-    def _extract_embedding_from_response(self, response) -> List[float]:
-        """Extract embedding vector from chat completion response.
-        
-        The custom API returns embeddings via chat completions format.
-        This method handles parsing the response to extract the embedding.
-        """
-        # Try to get content from the response
-        content = response.choices[0].message.content
-        
-        # The embedding might be returned as JSON in the content
-        if content:
-            import json
-            try:
-                # Try parsing as JSON array
-                embedding = json.loads(content)
-                if isinstance(embedding, list):
-                    return embedding
-            except (json.JSONDecodeError, TypeError):
-                pass
-        
-        # If response has embedding attribute (standard OpenAI format)
-        if hasattr(response, 'data') and response.data:
-            return response.data[0].embedding
-        
-        # Fallback: try to access embedding from message
-        message = response.choices[0].message
-        if hasattr(message, 'embedding'):
-            return message.embedding
-        
-        raise ValueError(f"Could not extract embedding from response: {response}")
-    
     def embed_text(self, text: str) -> List[float]:
-        """Generate embedding for single text using chat completions API."""
+        """Generate embedding for single text using embeddings API."""
         try:
-            response = self.client.chat.completions.create(
+            response = self.client.embeddings.create(
                 model=self.model,
-                messages=[{"role": "user", "content": text}],
+                input=text,
             )
-            return self._extract_embedding_from_response(response)
+            return response.data[0].embedding
         except Exception as e:
             print(f"Error generating embedding: {e}")
             raise
     
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts."""
-        embeddings = []
-        for text in texts:
-            embedding = self.embed_text(text)
-            embeddings.append(embedding)
-        return embeddings
+        try:
+            # OpenAI embeddings API supports batch input
+            response = self.client.embeddings.create(
+                model=self.model,
+                input=texts,
+            )
+            # Sort by index to ensure correct order
+            sorted_data = sorted(response.data, key=lambda x: x.index)
+            return [item.embedding for item in sorted_data]
+        except Exception as e:
+            print(f"Error generating embeddings: {e}")
+            raise
     
     def get_embedding_dimension(self) -> int:
         """Get embedding dimension."""

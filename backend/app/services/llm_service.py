@@ -18,6 +18,8 @@ class BaseLLMService(ABC):
         (r'\[doc:chunk[^\]]*\]', ''),
         # Remove markdown-style references like [doc:chunk ...]
         (r'\[doc:[^\]]*\]', ''),
+        # Remove full-width bracket references like 【doc:Passage 1】
+        (r'【[^】]*】', ''),
         # Remove separator lines with USER QUESTION or ASSISTANT ANSWER
         (r'\n*---+\s*\n*', '\n\n'),
         # Remove USER QUESTION: markers and everything after
@@ -28,13 +30,30 @@ class BaseLLMService(ABC):
         (r'\n*Question:\s*$', ''),
         # Remove User: markers at the end
         (r'\n*User:\s*$', ''),
+        # Remove "Cite passage" instructions that may be echoed
+        (r'\.?\s*Cite passage \d+\.?', ''),
+        # Remove "Provide that definition" and similar echoed instructions
+        (r'\.\s*Provide that [^.]+\.', '.'),
         # Clean up multiple newlines
         (r'\n{3,}', '\n\n'),
+        # Clean up multiple spaces
+        (r'  +', ' '),
     ]
     
     def clean_response(self, response: str) -> str:
         """Clean up LLM response to remove meta-information and artifacts."""
         cleaned = response
+        
+        # First, try to remove echoed prompt content before the actual answer
+        # Look for patterns like "... Cite passage X. If not enough..." followed by actual content
+        preamble_patterns = [
+            # Remove "Cite passage X." and anything before it including "If not enough..."
+            r'^.*?Cite passage \d+\.\s*(?:If not enough[^.]*\.\s*)?',
+            # Remove instruction-like preambles ending with "that."
+            r'^.*?(?:answer with that|we answer with that)\.\s*',
+        ]
+        for pattern in preamble_patterns:
+            cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE | re.DOTALL)
         
         for pattern, replacement in self.CLEANUP_PATTERNS:
             cleaned = re.sub(pattern, replacement, cleaned, flags=re.MULTILINE | re.DOTALL)
@@ -504,125 +523,3 @@ def get_llm_service_class():
     if settings.LLM_PROVIDER == "openai":
         return OpenAILLMService
     return OllamaLLMService
-        prompt: str,
-        temperature: float = 0.7,
-        max_tokens: int = 512,
-        top_p: float = 0.9,
-        top_k: int = 40,
-    ) -> AsyncGenerator[str, None]:
-        """Generate streaming response from Ollama.
-        
-        Args:
-            prompt: Input prompt
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            top_p: Nucleus sampling parameter
-            top_k: Top-k sampling parameter
-            
-        Yields:
-            Generated text tokens
-        """
-        model = await self.get_active_model()
-        
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": True,
-            "options": {
-                "num_predict": max_tokens,
-                "temperature": temperature,
-                "top_p": top_p,
-                "top_k": top_k,
-            }
-        }
-        
-        print(f"Starting Ollama stream request to {self.base_url}/api/generate")
-        print(f"Model: {model}, max_tokens: {max_tokens}")
-        
-        try:
-            async with httpx.AsyncClient(timeout=300.0) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self.base_url}/api/generate",
-                    json=payload,
-                ) as response:
-                    print(f"Response status: {response.status_code}")
-                    
-                    if response.status_code != 200:
-                        error_text = await response.aread()
-                        print(f"Error response: {error_text}")
-                        yield f"Error: Ollama returned status {response.status_code}"
-                        return
-                    
-                    line_count = 0
-                    async for line in response.aiter_lines():
-                        if line:
-                            line_count += 1
-                            try:
-                                data = json.loads(line)
-                                if "response" in data:
-                                    yield data["response"]
-                                if data.get("done", False):
-                                    break
-                            except json.JSONDecodeError:
-                                continue
-                    
-                    print(f"Stream ended after {line_count} lines")
-                    
-        except httpx.ConnectError as e:
-            print(f"Connection error: {e}")
-            yield f"Error: Cannot connect to Ollama at {self.base_url}"
-        except Exception as e:
-            print(f"Error in Ollama stream: {e}")
-            yield f"Error: {str(e)}"
-    
-    async def generate(
-        self,
-        prompt: str,
-        temperature: float = 0.7,
-        max_tokens: int = 512,
-        top_p: float = 0.9,
-        top_k: int = 40,
-    ) -> str:
-        """Generate non-streaming response from Ollama.
-        
-        Args:
-            prompt: Input prompt
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            top_p: Nucleus sampling parameter
-            top_k: Top-k sampling parameter
-            
-        Returns:
-            Generated text (cleaned)
-        """
-        model = await self.get_active_model()
-        
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "num_predict": max_tokens,
-                "temperature": temperature,
-                "top_p": top_p,
-                "top_k": top_k,
-            }
-        }
-        
-        try:
-            async with httpx.AsyncClient(timeout=300.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/api/generate",
-                    json=payload,
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    raw_response = data.get("response", "")
-                    return self.clean_response(raw_response)
-                else:
-                    return f"Error: Ollama returned status {response.status_code}"
-                    
-        except Exception as e:
-            return f"Error: {str(e)}"

@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - main
-      - feature_ollama
-      - feature_api
+      - feature/switch_backends
     tags:
       - 'v*'
   pull_request:
@@ -50,8 +49,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=ollama,enable=${{ github.ref == 'refs/heads/feature_ollama' }}
-            type=raw,value=api,enable=${{ github.ref == 'refs/heads/feature_api' }}
+            type=raw,value=switch-backends,enable=${{ github.ref == 'refs/heads/feature/switch_backends' }}
 
       - name: Extract metadata for frontend
         id: meta-frontend
@@ -64,8 +62,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=ollama,enable=${{ github.ref == 'refs/heads/feature_ollama' }}
-            type=raw,value=api,enable=${{ github.ref == 'refs/heads/feature_api' }}
+            type=raw,value=switch-backends,enable=${{ github.ref == 'refs/heads/feature/switch_backends' }}
 
       - name: Build and push backend image
         uses: docker/build-push-action@v5

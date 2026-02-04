@@ -49,9 +49,3 @@ huggingface-cli download meta-llama/Llama-3.2-3B-Instruct \
 
 echo ""
 echo "✓ Model downloaded successfully to $MODEL_PATH"
-echo ""
-echo "To use this model with vLLM:"
-echo "  python -m vllm.entrypoints.openai.api_server \\"
-echo "    --model $MODEL_PATH \\"
-echo "    --port 8001 \\"
-echo "    --max-model-len 8192"

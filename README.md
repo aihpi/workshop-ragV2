@@ -37,16 +37,23 @@ An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backen
 
 - **Ollama** (required): Install from https://ollama.com
   ```bash
-  # Linux
+  # Linux / WSL
   curl -fsSL https://ollama.com/install.sh | sh
   
   # macOS
   brew install ollama
   ```
+- **Docker** (required): For Qdrant vector database and containerized deployment
+  - Windows: [Docker Desktop with WSL2](https://docs.docker.com/desktop/install/windows-install/)
+  - macOS: [Docker Desktop](https://docs.docker.com/desktop/install/mac-install/)
+  - Linux: [Docker Engine](https://docs.docker.com/engine/install/)
 - Python 3.10+ (for native installation)
 - Node.js 18+ (for native installation)
-- Docker (for containerized deployment)
+- [uv](https://docs.astral.sh/uv/) (for native installation): `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- tmux (optional, for automated setup): `sudo apt install tmux` or `brew install tmux`
 - 16GB+ RAM recommended
+
+> **Windows Users**: Run all commands in **WSL/Ubuntu terminal**, not PowerShell or CMD.
 
 ### Installation
 
@@ -72,22 +79,39 @@ Visit http://localhost:3000
 > **Note**: The backend container connects to Ollama running on your host machine.
 > Ollama must be running before starting the containers.
 
-#### Method 2: Automated Setup
+#### Method 2: Automated Setup (Native)
+
+Requires: Python 3.10+, Node.js 18+, uv, tmux, Docker
 
 ```bash
-# Clone/navigate to repository
-cd workshop-rag
+# Clone repository
+git clone https://github.com/aihpi/workshop-ragV2.git
+cd workshop-ragV2
 
 # Run setup script
 ./scripts/setup_all.sh
 
-# Start all services
+# Start backend services (Qdrant, Ollama, Backend API)
 ./scripts/start_all.sh
+
+# In a new terminal: start frontend
+cd frontend
+npm install
+npm run dev
 ```
 
-#### Method 2: Manual Setup
+Visit http://localhost:3000
 
-**1. Backend Setup**
+#### Method 3: Manual Setup (Native)
+
+**1. Clone and Backend Setup**
+
+```bash
+git clone https://github.com/aihpi/workshop-ragV2.git
+cd workshop-ragV2
+```
+
+**2. Backend Setup**
 
 ```bash
 cd backend
@@ -95,17 +119,20 @@ cd backend
 source .venv/bin/activate
 ```
 
-**2. Install Ollama and Download Model**
+**3. Install Ollama and Download Model**
 
 ```bash
-# Install Ollama (Linux)
+# Install Ollama (Linux/WSL)
 curl -fsSL https://ollama.com/install.sh | sh
+
+# macOS
+# brew install ollama
 
 # Pull the default model
 ollama pull qwen2.5:7b-instruct
 ```
 
-**3. Start Services**
+**4. Start Services**
 
 Terminal 1 - Qdrant:
 ```bash
@@ -124,7 +151,7 @@ source .venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**4. Frontend Setup**
+**5. Frontend Setup**
 
 ```bash
 cd frontend

@@ -61,6 +61,9 @@ Pull pre-built images from GitHub Container Registry:
 # Clone repository
 git clone https://github.com/aihpi/workshop-ragV2.git
 cd workshop-ragV2
+
+# Create runtime env file for Docker Compose
+cp .env.example .env
 ```
 
 Ollama mode:
@@ -70,19 +73,27 @@ Ollama mode:
 ollama serve &
 ollama pull qwen2.5:7b-instruct
 
+# In .env, set:
+#   LLM_PROVIDER=ollama
+#   EMBEDDING_PROVIDER=local
+
 # Start containers
-docker-compose up -d
+docker compose up -d
 ```
 
 OpenAI/LiteLLM mode:
 
 ```bash
-LLM_PROVIDER=openai \
-EMBEDDING_PROVIDER=local \
-OPENAI_API_KEY=your_api_key \
-OPENAI_BASE_URL=http://localhost:4000 \
-OPENAI_LLM_MODEL=your_litellm_model \
-docker-compose up -d
+# In .env, set for example:
+#   LLM_PROVIDER=openai
+#   EMBEDDING_PROVIDER=local
+#   OPENAI_API_KEY=your_api_key
+#   OPENAI_BASE_URL=https://api.aisc.hpi.de/
+#   OPENAI_LLM_MODEL=ministral-3-14b
+# or
+#   OPENAI_LLM_MODEL=gpt-oss-120b
+
+docker compose up -d
 ```
 
 Visit http://localhost:3000

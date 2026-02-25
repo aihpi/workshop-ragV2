@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { queryRAGStream, RetrievedChunk, updateChatMessage } from '../services/api';
+import { queryRAG, RetrievedChunk, updateChatMessage } from '../services/api';
 import RetrievedPassagesModal from './RetrievedPassagesModal';
 import { theme } from '../theme';
 
@@ -121,41 +121,29 @@ const RAGChat: React.FC<RAGChatProps> = ({
 
     const assistantMessageId = (Date.now() + 1).toString();
 
-    let finalAnswer = '';
-    let finalChunks: RetrievedChunk[] = [];
-    queryRAGStream(
-      {
-        query,
-        top_k: topN,
-        temperature,
-        max_tokens: maxTokens,
-        top_p: topP,
-        top_k_sampling: topK,
-        use_chat_history: enableChatHistory,
-        chat_id: currentSessionId || undefined,
-        prompt: activePrompt?.template,
-      },
-      (token) => {
-        finalAnswer += token;
-        setChatState(prev => ({
-          ...prev,
-          currentAnswer: finalAnswer
-        }));
-      },
-      (chunks) => {
-        finalChunks = chunks;
-        setChatState(prev => ({ ...prev, currentChunks: chunks }));
-      },
-      () => {
-        // finalize: add the complete assistant message
+    // Use non-streaming query for cleaner responses
+    (async () => {
+      try {
+        const response = await queryRAG({
+          query,
+          top_k: topN,
+          temperature,
+          max_tokens: maxTokens,
+          top_p: topP,
+          top_k_sampling: topK,
+          use_chat_history: enableChatHistory,
+          chat_id: currentSessionId || undefined,
+          prompt: activePrompt?.template,
+        });
+
         const finalMessage: Message = {
           id: assistantMessageId,
           type: 'assistant',
-          content: finalAnswer,
-          chunks: finalChunks,
+          content: response.answer,
+          chunks: response.retrieved_chunks,
           timestamp: new Date(),
         };
-        
+
         setChatState(prev => ({
           ...prev,
           messages: [...prev.messages, finalMessage],
@@ -163,27 +151,23 @@ const RAGChat: React.FC<RAGChatProps> = ({
           currentChunks: [],
           isStreaming: false
         }));
-        
-        // Refresh sessions list to show updated chat
+
         if (onMessageSent) {
           onMessageSent();
         }
-        
-        // Refocus the textarea
+
         setTimeout(() => {
           textareaRef.current?.focus();
         }, 0);
-      },
-      (error) => {
-        console.error('Streaming error:', error);
-        // add error message instead of updating placeholder
+      } catch (error: any) {
+        console.error('Query error:', error);
         const errorMessage: Message = {
           id: assistantMessageId,
           type: 'assistant',
-          content: `[Error] ${error}`,
+          content: `[Error] ${error?.message || error}`,
           timestamp: new Date(),
         };
-        
+
         setChatState(prev => ({
           ...prev,
           messages: [...prev.messages, errorMessage],
@@ -192,7 +176,7 @@ const RAGChat: React.FC<RAGChatProps> = ({
           currentChunks: []
         }));
       }
-    );
+    })();
 
     updateState({ query: '' });
   };
@@ -435,42 +419,30 @@ const RAGChat: React.FC<RAGChatProps> = ({
                           });
 
                           const assistantMessageId = (Date.now() + 1).toString();
-                          let finalAnswer = '';
-                          let finalChunks: RetrievedChunk[] = [];
                           
-                          queryRAGStream(
-                            {
-                              query: userQuery,
-                              top_k: topN,
-                              temperature,
-                              max_tokens: maxTokens,
-                              top_p: topP,
-                              top_k_sampling: topK,
-                              use_chat_history: false, // Don't save as new message, we'll update existing one with versions
-                              chat_id: currentSessionId || undefined,
-                              prompt: activePrompt?.template,
-                            },
-                            (token) => {
-                              finalAnswer += token;
-                              setChatState(prev => ({
-                                ...prev,
-                                currentAnswer: finalAnswer
-                              }));
-                            },
-                            (chunks) => {
-                              finalChunks = chunks;
-                              setChatState(prev => ({ ...prev, currentChunks: chunks }));
-                            },
-                            () => {
-                              // Add new response version
-                              const newVersions = [...versions, finalAnswer];
-                              const newVersionsChunks = [...versionsChunks, finalChunks];
-                              const newMessagesPerVersion = [...messagesPerVersion, []]; // New version has no subsequent messages
+                          // Use non-streaming query for cleaner responses
+                          (async () => {
+                            try {
+                              const response = await queryRAG({
+                                query: userQuery,
+                                top_k: topN,
+                                temperature,
+                                max_tokens: maxTokens,
+                                top_p: topP,
+                                top_k_sampling: topK,
+                                use_chat_history: false,
+                                chat_id: currentSessionId || undefined,
+                                prompt: activePrompt?.template,
+                              });
+
+                              const newVersions = [...versions, response.answer];
+                              const newVersionsChunks = [...versionsChunks, response.retrieved_chunks];
+                              const newMessagesPerVersion = [...messagesPerVersion, []];
                               const finalMessage: Message = {
                                 id: assistantMessageId,
                                 type: 'assistant',
-                                content: finalAnswer,
-                                chunks: finalChunks,
+                                content: response.answer,
+                                chunks: response.retrieved_chunks,
                                 timestamp: new Date(),
                                 versions: newVersions,
                                 versionsChunks: newVersionsChunks,
@@ -486,13 +458,8 @@ const RAGChat: React.FC<RAGChatProps> = ({
                                 isStreaming: false
                               }));
                               
-                              // Save version information to backend if chat history is enabled
                               if (enableChatHistory && currentSessionId) {
-                                // Calculate message index: we need to find where this assistant message is in the history
-                                // It's the number of completed Q&A pairs before this point
                                 const messageIndex = Math.floor(newMessages.length / 2);
-                                
-                                // Convert message snapshots to plain objects (remove React metadata)
                                 const messagesPerVersionPlain = newMessagesPerVersion.map(versionMessages => 
                                   versionMessages.map((msg: Message) => ({
                                     query: msg.type === 'user' ? msg.content : undefined,
@@ -513,17 +480,15 @@ const RAGChat: React.FC<RAGChatProps> = ({
                                 });
                               }
                               
-                              // Trigger session refresh
                               if (onMessageSent) {
                                 onMessageSent();
                               }
-                            },
-                            (error) => {
-                              console.error('Streaming error:', error);
+                            } catch (error: any) {
+                              console.error('Query error:', error);
                               const errorMessage: Message = {
                                 id: assistantMessageId,
                                 type: 'assistant',
-                                content: `[Error] ${error}`,
+                                content: `[Error] ${error?.message || error}`,
                                 timestamp: new Date(),
                               };
                               setChatState(prev => ({
@@ -534,7 +499,7 @@ const RAGChat: React.FC<RAGChatProps> = ({
                                 currentChunks: []
                               }));
                             }
-                          );
+                          })();
                         }
                       }
                     }}

@@ -32,7 +32,7 @@ services:
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b-instruct}
       # OpenAI-compatible API settings (used when provider=openai)
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://10.127.129.0:4000}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:4000}
       - OPENAI_LLM_MODEL=${OPENAI_LLM_MODEL:-gpt-oss-120b}
       - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-octen-embedding-8b}
       - OPENAI_EMBEDDING_DIM=${OPENAI_EMBEDDING_DIM:-4096}

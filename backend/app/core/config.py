@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     
     # OpenAI-compatible API Settings
     OPENAI_API_KEY: str = ""
-    OPENAI_BASE_URL: str = "http://10.127.129.0:4000"
+    OPENAI_BASE_URL: str = "http://localhost:4000"
     OPENAI_LLM_MODEL: str = "gpt-oss-120b"
     OPENAI_EMBEDDING_MODEL: str = "octen-embedding-8b"
     OPENAI_EMBEDDING_DIM: int = 4096  # Dimension for OpenAI embeddings

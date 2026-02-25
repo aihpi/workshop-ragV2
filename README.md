@@ -1,6 +1,6 @@
 # RAG Tool - Retrieval-Augmented Generation
 
-An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backend, React frontend, Qdrant vector database, and Ollama for inference.
+An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backend, React frontend, Qdrant vector database, and configurable LLM providers (Ollama or OpenAI-compatible APIs such as LiteLLM).
 
 ![Logo](img/logo_aisc_bmftr.jpg)
 
@@ -35,7 +35,10 @@ An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backen
 
 ### Prerequisites
 
-- **Ollama** (required): Install from https://ollama.com
+- **LLM provider**
+  - **Ollama** (for local inference): Install from https://ollama.com
+  - **OpenAI-compatible API** (for remote inference): e.g. LiteLLM proxy endpoint
+- Optional Ollama install (only needed when `LLM_PROVIDER=ollama`):
   ```bash
   # Linux
   curl -fsSL https://ollama.com/install.sh | sh
@@ -55,22 +58,37 @@ An educational RAG (Retrieval-Augmented Generation) system with a FastAPI backen
 Pull pre-built images from GitHub Container Registry:
 
 ```bash
+# Clone repository
+git clone https://github.com/aihpi/workshop-ragV2.git
+cd workshop-ragV2
+```
+
+Ollama mode:
+
+```bash
 # Start Ollama on host
 ollama serve &
 ollama pull qwen2.5:7b-instruct
 
-# Clone repository
-git clone https://github.com/aihpi/workshop-ragV2.git
-cd workshop-ragV2
+# Start containers
+docker-compose up -d
+```
 
-# Start with Docker Compose
+OpenAI/LiteLLM mode:
+
+```bash
+LLM_PROVIDER=openai \
+EMBEDDING_PROVIDER=local \
+OPENAI_API_KEY=your_api_key \
+OPENAI_BASE_URL=http://localhost:4000 \
+OPENAI_LLM_MODEL=your_litellm_model \
 docker-compose up -d
 ```
 
 Visit http://localhost:3000
 
-> **Note**: The backend container connects to Ollama running on your host machine.
-> Ollama must be running before starting the containers.
+> **Note**: In Ollama mode, the backend container connects to Ollama on the host.
+> In OpenAI mode, Ollama is not required.
 
 #### Method 2: Automated Setup
 
@@ -85,7 +103,7 @@ cd workshop-rag
 ./scripts/start_all.sh
 ```
 
-#### Method 2: Manual Setup
+#### Method 3: Manual Setup
 
 **1. Backend Setup**
 
@@ -95,7 +113,9 @@ cd backend
 source .venv/bin/activate
 ```
 
-**2. Install Ollama and Download Model**
+**2. Configure provider**
+
+For Ollama:
 
 ```bash
 # Install Ollama (Linux)
@@ -105,6 +125,16 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama pull qwen2.5:7b-instruct
 ```
 
+For OpenAI/LiteLLM, edit `backend/.env`:
+
+```bash
+LLM_PROVIDER=openai
+EMBEDDING_PROVIDER=local
+OPENAI_API_KEY=your_api_key_here
+OPENAI_BASE_URL=http://localhost:4000
+OPENAI_LLM_MODEL=your_litellm_model
+```
+
 **3. Start Services**
 
 Terminal 1 - Qdrant:
@@ -112,7 +142,7 @@ Terminal 1 - Qdrant:
 ./scripts/start_qdrant.sh
 ```
 
-Terminal 2 - Ollama:
+Terminal 2 - Ollama (only when `LLM_PROVIDER=ollama`):
 ```bash
 ollama serve
 ```
@@ -164,10 +194,23 @@ Visit http://localhost:3000
 Edit `backend/.env`:
 
 ```bash
-# Ollama Settings
+# Provider selection
+LLM_PROVIDER=ollama
+EMBEDDING_PROVIDER=local
+
+# Ollama settings (used when LLM_PROVIDER=ollama)
 OLLAMA_HOST=localhost
 OLLAMA_PORT=11434
 OLLAMA_MODEL=qwen2.5:7b-instruct
+
+# OpenAI-compatible settings (used when LLM_PROVIDER=openai or EMBEDDING_PROVIDER=openai)
+OPENAI_API_KEY=your_api_key_here
+OPENAI_BASE_URL=http://localhost:4000
+OPENAI_LLM_MODEL=your_litellm_model
+OPENAI_EMBEDDING_MODEL=your_embedding_model
+OPENAI_EMBEDDING_DIM=1536
+
+# Common LLM settings
 LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=512
 
@@ -281,7 +324,8 @@ npm run type-check
 
 ### Backend won't start
 - Check if Qdrant is running: `curl http://localhost:6333`
-- Check if Ollama is running: `curl http://localhost:11434/api/tags`
+- If using Ollama: `curl http://localhost:11434/api/tags`
+- If using OpenAI-compatible provider: check `backend/.env` values for `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_LLM_MODEL`
 - Verify `.env` configuration
 
 ### Model download fails
@@ -302,10 +346,10 @@ npm run type-check
 ## Technical Details
 
 - **Embedding Model**: all-MiniLM-L6-v2 (384 dimensions)
-- **LLM**: Qwen 2.5 7B Instruct (via Ollama)
+- **LLM**: Qwen 2.5 7B Instruct by default (or any OpenAI-compatible model via LiteLLM)
 - **Chunking**: 512 tokens with 128 token overlap
 - **Vector Distance**: Cosine similarity
-- **LLM Backend**: Ollama (port 11434)
+- **LLM Backends**: Ollama (port 11434) or OpenAI-compatible endpoint (e.g. LiteLLM)
 
 ## Docker Images
 

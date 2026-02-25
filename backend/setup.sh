@@ -3,6 +3,28 @@
 
 set -e
 
+ENV_FILE=".env"
+
+get_env_value() {
+    local key="$1"
+    local default_value="$2"
+
+    if [ -f "$ENV_FILE" ]; then
+        local value
+        value=$(grep -E "^${key}=" "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true)
+        value="${value%\"}"
+        value="${value#\"}"
+        value="${value%\'}"
+        value="${value#\'}"
+        if [ -n "$value" ]; then
+            echo "$value"
+            return
+        fi
+    fi
+
+    echo "$default_value"
+}
+
 echo "===== RAG Backend Setup ====="
 
 # Check Python version
@@ -57,6 +79,11 @@ echo "===== Setup Complete ====="
 echo ""
 echo "Next steps:"
 echo "1. Activate virtual environment: source .venv/bin/activate"
-echo "2. Make sure Ollama is running: ollama serve"
+LLM_PROVIDER_CONFIGURED="${LLM_PROVIDER:-$(get_env_value "LLM_PROVIDER" "ollama")}"
+if [ "$LLM_PROVIDER_CONFIGURED" = "ollama" ]; then
+    echo "2. Make sure Ollama is running: ollama serve"
+else
+    echo "2. Verify OpenAI-compatible settings in .env (OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_LLM_MODEL)"
+fi
 echo "3. Start Qdrant: ./scripts/start_qdrant.sh"
 echo "4. Run backend: uvicorn app.main:app --reload"

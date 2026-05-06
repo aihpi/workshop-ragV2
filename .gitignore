@@ -54,6 +54,9 @@ Thumbs.db
 # Qdrant storage
 qdrant_storage/
 
+# Ollama runtime storage
+ollama_storage/
+
 # Chat history
 chat_history/
 

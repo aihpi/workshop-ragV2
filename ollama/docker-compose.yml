@@ -1,0 +1,19 @@
+name: workshop-ragv2
+
+services:
+  ollama:
+    image: ollama/ollama:0.5.4
+    container_name: workshop-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_storage:/root/.ollama
+    restart: unless-stopped
+    # GPU support: uncomment if you have NVIDIA Container Toolkit installed.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]

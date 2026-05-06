@@ -1,0 +1,14 @@
+name: workshop-ragv2
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    container_name: workshop-qdrant
+    ports:
+      - "6433:6333"   # REST  (host:container)
+      - "6434:6334"   # gRPC
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    restart: unless-stopped

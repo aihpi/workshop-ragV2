@@ -89,3 +89,6 @@ uploads/
 
 # Workshop 3 notebooks (auto-generated plots)
 notebooks/figures/
+
+# Cached embeddings (regenerated per machine)
+notebooks/embedding_cache/

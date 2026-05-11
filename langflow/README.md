@@ -23,12 +23,17 @@ Flows 1 and 2 ship in two variants:
 
 ## 1. Prerequisites
 
-You need three things on your machine before opening a single flow.
+You need three things on your machine before opening a single flow:
+
+* Docker Desktop (or Docker CLI)
+* Qdrant and Qdrant container in Docker
+* Ollama
+
+This setup should be installed already from the [Getting Started Workshop](https://github.com/aihpi/workshop-getting-started).
 
 ### 1.1 Docker
 
-Used to run the Langflow container (and the Qdrant container, which you
-already have).
+Used to run the Langflow container (and the Qdrant container).
 Install: <https://www.docker.com/products/docker-desktop>
 
 ### 1.2 Ollama (local install)

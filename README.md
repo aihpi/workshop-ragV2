@@ -74,7 +74,7 @@ git clone https://github.com/aihpi/workshop-ragV2.git
 cd workshop-ragV2
 
 # Start with Docker Compose
-docker-compose pill && docker-compose up -d
+docker-compose pull && docker-compose up -d
 ```
 
 Visit http://localhost:3000

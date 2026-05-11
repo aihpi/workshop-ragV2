@@ -1,21 +1,19 @@
 # RAG Workshop — Langflow Track
 
 This folder contains a visual, flow-based companion to the main FastAPI / React
-RAG track in this repository. You will build the same RAG pipeline three times,
+RAG track in this repository. You will build the same RAG pipeline twice,
 each time with more capability, by wiring components together in
 [Langflow](https://www.langflow.org/).
 
-The three flows progress as follows:
+The flows progress as follows:
 
+0. **`00_ChatBot`** — warm-up: a plain Ollama-backed chat bot, no retrieval.
 1. **`01_RAG_basic`** — minimal RAG: load PDFs, chunk, embed, store in Qdrant,
    retrieve, prompt, generate.
 2. **`02_RAG_memory`** — adds persistent memory so the assistant can recall user
    preferences and frequently retrieved facts across turns.
-3. **`03_RAG_query_transformation`** — rewrites the user query into three
-   variants (close / generic / specific), retrieves in parallel, merges and
-   deduplicates the context, then answers.
 
-Each flow ships in two variants:
+Flows 1 and 2 ship in two variants:
 
 * `*.json` — exercise version. Components are placed and configured but
   edges are missing. **Wire them up yourself.**
@@ -27,40 +25,45 @@ Each flow ships in two variants:
 
 You need three things on your machine before opening a single flow.
 
-### 1.1 Docker Desktop
+### 1.1 Docker
 
-Used to run Langflow itself, Qdrant, and (optionally) Ollama.
+Used to run the Langflow container (and the Qdrant container, which you
+already have).
 Install: <https://www.docker.com/products/docker-desktop>
 
-### 1.2 Ollama
+### 1.2 Ollama (local install)
 
-Hosts the local LLM and embedding model.
+Hosts the local LLM and embedding model. Install **natively on the host**
+(not in Docker) — the Langflow container reaches it via
+`host.docker.internal:11434`.
 Install: <https://ollama.com/download>
 
-You can also run Ollama in Docker — see `ollama/docker-compose.yml`.
+### 1.3 Qdrant container
 
-### 1.3 Qdrant
+Vector store for the retrieved chunks. The workshop assumes you already run
+a Qdrant container reachable on host port **6333** (the standard default).
+Quick start if you do not have one yet:
 
-Vector store for the retrieved chunks. We bundle a Docker Compose file at
-`qdrant/docker-compose.yml`, so no separate install is required. The reference
-docs are at <https://qdrant.tech/documentation/quick-start/>.
+```bash
+docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant
+```
+
+Reference docs: <https://qdrant.tech/documentation/quick-start/>.
 
 ---
 
 ## 2. Hardware check & model selection
 
-The workshop default is **`mistral:7b-instruct`**:
+The workshop default is **`qwen2.5:7b-instruct`**:
 
 * The **Instruct** variant is tuned to follow instructions and answer over
   retrieved documents, which is what RAG needs.
 * The **Base** variant is meant for further fine-tuning, not direct use.
-* The **Reasoning** variant adds chain-of-thought overhead that hurts latency
-  on straightforward retrieval tasks.
 
-`mistral:7b-instruct` runs comfortably on machines with **~8 GB of free RAM**
+`qwen2.5:7b-instruct` runs comfortably on machines with **~8 GB of free RAM**
 (or 6 GB of VRAM on a GPU). Participants with stronger hardware can swap in a
-larger Mistral model (e.g. `mistral-small3.2` at ~24 GB) for higher answer
-quality — set `OLLAMA_LLM_MODEL` in `.env` and `ollama pull` the bigger tag.
+larger model for higher answer quality — set `OLLAMA_LLM_MODEL` in `.env` and
+`ollama pull` the bigger tag.
 
 If you are unsure whether your machine can handle a given model, run one of
 these quick screeners first:
@@ -72,11 +75,10 @@ these quick screeners first:
 
 ## 3. Pull the models into Ollama
 
-With Ollama running (desktop app or `ollama/docker-compose.yml`), pull the LLM
-and the embedding model:
+With Ollama running on the host, pull the LLM and the embedding model:
 
 ```bash
-ollama pull mistral:7b-instruct
+ollama pull qwen2.5:7b-instruct
 ollama pull nomic-embed-text
 ```
 
@@ -85,23 +87,19 @@ search the Ollama model library at <https://ollama.com/library>.
 
 ---
 
-## 4. Custom Langflow container
+## 4. Langflow container
 
-The workshop ships a **custom Langflow image** pinned to **1.9.0** rather than
-the floating `latest` tag. Two reasons:
+The workshop uses the **published Langflow image** pinned to **1.9.0** rather
+than the floating `latest` tag. The flow JSONs were authored and tested
+against 1.9.0 — pinning avoids schema-drift warnings when a new Langflow
+release renames a field.
 
-1. The flow JSONs were authored and tested against 1.9.0 — pinning avoids
-   schema-drift warnings when a new Langflow release renames a field.
-2. The Dockerfile pre-installs `qdrant-client`, `pypdf`, and
-   `sentence-transformers` so the flows run without follow-up `pip install`s
-   inside the container.
-
-Build and run:
+Run:
 
 ```bash
 cd ~/Workshops/workshop-ragV2/langflow
 cp .env.example .env          # adjust ports or model tags here if you need to
-docker compose up --build -d
+docker compose up -d
 ```
 
 Logs:
@@ -117,34 +115,28 @@ The UI lives at **<http://localhost:7860>** (or the `LANGFLOW_PORT` you set in
 
 ## 5. Start every service
 
-The three stacks are independent. Start them in this order:
+The Langflow container is the only thing this folder starts. Make sure the
+other two pieces are already running:
 
 ```bash
-# 1. Qdrant — vector store on host ports 6433 (REST) and 6434 (gRPC)
-cd ~/Workshops/workshop-ragV2/qdrant
-docker compose up -d
+# 1. Qdrant — your existing container on host port 6333
+docker ps --filter ancestor=qdrant/qdrant
 
-# 2. Ollama — only if you do NOT already run the Ollama desktop app
-cd ~/Workshops/workshop-ragV2/ollama
-docker compose up -d
-# (skip if you started Ollama natively; the flows will reach 11434 either way)
+# 2. Ollama — running natively on the host
+ollama list
 
 # 3. Langflow
 cd ~/Workshops/workshop-ragV2/langflow
-docker compose up --build -d
+docker compose up -d
 ```
 
 Verify:
 
 ```bash
-curl http://localhost:6433/healthz       # Qdrant -> "healthz check passed"
+curl http://localhost:6333/healthz       # Qdrant -> "healthz check passed"
 curl http://localhost:11434/api/tags     # Ollama -> JSON list of pulled models
 curl http://localhost:7860               # Langflow -> HTML index
 ```
-
-> **Port note**: The repo's main FastAPI/React track uses Qdrant on port
-> `6333`. The Langflow track deliberately uses port `6433` so both stacks can
-> run side by side without conflict.
 
 ---
 
@@ -172,7 +164,7 @@ grounded answer.
 
 When stuck, open `01_RAG_basic_solution.json` in a second tab to compare.
 
-Repeat for `02_RAG_memory.json` and `03_RAG_query_transformation.json`.
+Repeat for `02_RAG_memory.json`.
 
 ---
 
@@ -181,18 +173,16 @@ Repeat for `02_RAG_memory.json` and `03_RAG_query_transformation.json`.
 ```
 langflow/
 ├── README.md                # this file
-├── Dockerfile               # FROM langflowai/langflow:1.9.0
-├── docker-compose.yml       # Langflow service
+├── docker-compose.yml       # Langflow service (uses langflowai/langflow:1.9.0)
 ├── .env.example             # copy to .env before first run
 ├── data/                    # tabular data (TEP CSV)
 ├── pdfs/                    # 7 PDF papers used as the RAG corpus
 └── flows/
+    ├── 00_ChatBot.json
     ├── 01_RAG_basic.json
     ├── 01_RAG_basic_solution.json
     ├── 02_RAG_memory.json
-    ├── 02_RAG_memory_solution.json
-    ├── 03_RAG_query_transformation.json
-    └── 03_RAG_query_transformation_solution.json
+    └── 02_RAG_memory_solution.json
 ```
 
 ---
@@ -201,8 +191,8 @@ langflow/
 
 | Symptom | Likely cause | Fix |
 |--------|--------------|-----|
-| `Connection refused` from Langflow to Qdrant | Qdrant container not started, or wrong host | Confirm `docker ps` shows `workshop-qdrant`. Inside Langflow, `QDRANT_HOST=host.docker.internal` and `QDRANT_PORT=6433` |
-| `model not found` from Ollama | Tag not pulled | `ollama pull mistral:7b-instruct` and `ollama pull nomic-embed-text` |
+| `Connection refused` from Langflow to Qdrant | Qdrant container not started, or wrong host | Confirm `docker ps` shows a running Qdrant container. Inside Langflow, `QDRANT_HOST=host.docker.internal` and `QDRANT_PORT=6333` |
+| `model not found` from Ollama | Tag not pulled | `ollama pull qwen2.5:7b-instruct` and `ollama pull nomic-embed-text` |
 | Flow import warns "Missing component" | Wrong Langflow version | Confirm the running container is `1.9.0`: `docker inspect workshop-langflow --format '{{.Config.Image}}'` |
 | Empty retrievals | Ingest pipeline never ran | Open the flow → run the **File → SplitText → Qdrant (ingest)** branch once before chatting |
-| OOM when LLM responds | Model too big for hardware | Switch `OLLAMA_LLM_MODEL` to a smaller tag (e.g. `mistral:7b-instruct-q4_K_M`) and `ollama pull` it |
+| OOM when LLM responds | Model too big for hardware | Switch `OLLAMA_LLM_MODEL` to a smaller tag (e.g. `qwen2.5:3b-instruct`) and `ollama pull` it |

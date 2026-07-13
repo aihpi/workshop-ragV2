@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 330" role="img" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>The same table in Markdown and LaTeX — a naive pipe count only detects one of them</title>
+  <text x="430" y="30" text-anchor="middle" font-size="19" font-weight="700" fill="#7d8590">One table, two syntaxes — a metric that only sees one</text>
+
+  <!-- left: markdown -->
+  <rect x="40" y="60" width="380" height="200" rx="8" fill="#ffffff" stroke="#8b949e"/>
+  <text x="56" y="86" font-size="14" font-weight="600" fill="#1f2328">Markdown output</text>
+  <g font-size="13" font-family="ui-monospace, Menlo, monospace" fill="#1f2328">
+    <text x="56" y="114"><tspan fill="#0969da" font-weight="700">|</tspan> Method <tspan fill="#0969da" font-weight="700">|</tspan> Hidden <tspan fill="#0969da" font-weight="700">|</tspan> Success <tspan fill="#0969da" font-weight="700">|</tspan></text>
+    <text x="56" y="134"><tspan fill="#0969da" font-weight="700">|</tspan>--------<tspan fill="#0969da" font-weight="700">|</tspan>--------<tspan fill="#0969da" font-weight="700">|</tspan>---------<tspan fill="#0969da" font-weight="700">|</tspan></text>
+    <text x="56" y="154"><tspan fill="#0969da" font-weight="700">|</tspan> RTRL   <tspan fill="#0969da" font-weight="700">|</tspan> 3      <tspan fill="#0969da" font-weight="700">|</tspan> ≈ 170   <tspan fill="#0969da" font-weight="700">|</tspan></text>
+    <text x="56" y="174"><tspan fill="#0969da" font-weight="700">|</tspan> BPTT   <tspan fill="#0969da" font-weight="700">|</tspan> 3      <tspan fill="#0969da" font-weight="700">|</tspan> ≈ 168   <tspan fill="#0969da" font-weight="700">|</tspan></text>
+  </g>
+  <rect x="56" y="204" width="240" height="24" rx="12" fill="#dafbe1" stroke="#1a7f37"/>
+  <text x="176" y="220" text-anchor="middle" font-size="12" fill="#1a7f37">pipe count high ✓ table detected</text>
+  <text x="56" y="250" font-size="11" fill="#7d8590">every column border is a "|" — the metric sees them all</text>
+
+  <!-- right: latex -->
+  <rect x="440" y="60" width="380" height="200" rx="8" fill="#ffffff" stroke="#8b949e"/>
+  <text x="456" y="86" font-size="14" font-weight="600" fill="#1f2328">LaTeX output (same table!)</text>
+  <g font-size="13" font-family="ui-monospace, Menlo, monospace" fill="#1f2328">
+    <text x="456" y="114">\begin{tabular}{<tspan fill="#0969da" font-weight="700">|</tspan>l<tspan fill="#0969da" font-weight="700">|</tspan>l<tspan fill="#0969da" font-weight="700">|</tspan>l<tspan fill="#0969da" font-weight="700">|</tspan>}</text>
+    <text x="456" y="134">RTRL <tspan fill="#bc4c00" font-weight="700">&amp;</tspan> 3 <tspan fill="#bc4c00" font-weight="700">&amp;</tspan> $\approx$ 170 \\</text>
+    <text x="456" y="154">BPTT <tspan fill="#bc4c00" font-weight="700">&amp;</tspan> 3 <tspan fill="#bc4c00" font-weight="700">&amp;</tspan> $\approx$ 168 \\</text>
+    <text x="456" y="174">\end{tabular}</text>
+  </g>
+  <rect x="456" y="204" width="300" height="24" rx="12" fill="#fff1e5" stroke="#bc4c00"/>
+  <text x="606" y="220" text-anchor="middle" font-size="12" fill="#bc4c00">pipe count tiny — rows invisible to the metric</text>
+  <text x="456" y="250" font-size="11" fill="#7d8590">rows use "&amp;" as separator — only {|l|l|l|} contains pipes</text>
+
+  <text x="430" y="292" text-anchor="middle" font-size="13" fill="#7d8590">A naive pipe count sees the Markdown table but misses the LaTeX rows —</text>
+  <text x="430" y="310" text-anchor="middle" font-size="13" fill="#7d8590">always check metrics against the raw output.</text>
+</svg>

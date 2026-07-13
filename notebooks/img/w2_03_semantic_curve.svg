@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 400" role="img" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Semantic chunking: cut where the meaning shifts</title>
+  <text x="430" y="30" text-anchor="middle" font-size="19" font-weight="700" fill="#7d8590">Semantic chunking: cut where meaning shifts</text>
+
+  <!-- sentence row: 10 boxes, x = 60 + i*74, width 66 -->
+  <g font-size="13">
+    <rect x="60"  y="58" width="66" height="32" rx="6" fill="#ffffff" stroke="#8b949e"/><text x="93"  y="79" text-anchor="middle" fill="#1f2328">S1</text>
+    <rect x="134" y="58" width="66" height="32" rx="6" fill="#ffffff" stroke="#8b949e"/><text x="167" y="79" text-anchor="middle" fill="#1f2328">S2</text>
+    <rect x="208" y="58" width="66" height="32" rx="6" fill="#ffffff" stroke="#8b949e"/><text x="241" y="79" text-anchor="middle" fill="#1f2328">S3</text>
+    <rect x="282" y="58" width="66" height="32" rx="6" fill="#ffffff" stroke="#8b949e"/><text x="315" y="79" text-anchor="middle" fill="#1f2328">S4</text>
+    <rect x="356" y="58" width="66" height="32" rx="6" fill="#ffffff" stroke="#8b949e"/><text x="389" y="79" text-anchor="middle" fill="#1f2328">S5</text>
+    <rect x="430" y="58" width="66" height="32" rx="6" fill="#ffffff" stroke="#8b949e"/><text x="463" y="79" text-anchor="middle" fill="#1f2328">S6</text>
+    <rect x="504" y="58" width="66" height="32" rx="6" fill="#ffffff" stroke="#8b949e"/><text x="537" y="79" text-anchor="middle" fill="#1f2328">S7</text>
+    <rect x="578" y="58" width="66" height="32" rx="6" fill="#ffffff" stroke="#8b949e"/><text x="611" y="79" text-anchor="middle" fill="#1f2328">S8</text>
+    <rect x="652" y="58" width="66" height="32" rx="6" fill="#ffffff" stroke="#8b949e"/><text x="685" y="79" text-anchor="middle" fill="#1f2328">S9</text>
+    <rect x="726" y="58" width="66" height="32" rx="6" fill="#ffffff" stroke="#8b949e"/><text x="759" y="79" text-anchor="middle" fill="#1f2328">S10</text>
+  </g>
+  <text x="812" y="79" font-size="11" fill="#7d8590">sentences</text>
+
+  <!-- chart area y 120..280; similarity points at gap midpoints x = 130,204,278,352,426,500,574,648,722 -->
+  <text x="60" y="118" font-size="12" fill="#7d8590">cosine similarity between neighboring sentences</text>
+  <line x1="60" y1="130" x2="60" y2="280" stroke="#8b949e"/>
+  <line x1="60" y1="280" x2="800" y2="280" stroke="#8b949e"/>
+
+  <!-- threshold -->
+  <line x1="60" y1="238" x2="800" y2="238" stroke="#bc4c00" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="798" y="230" text-anchor="end" font-size="12" fill="#bc4c00">threshold (percentile)</text>
+
+  <!-- polyline: dips at gaps S3|S4 (x=278) and S7|S8 (x=648) -->
+  <polyline points="130,158 204,150 278,262 352,162 426,148 500,168 574,156 648,268 722,152"
+            fill="none" stroke="#0969da" stroke-width="2"/>
+  <circle cx="130" cy="158" r="4" fill="#0969da"/>
+  <circle cx="204" cy="150" r="4" fill="#0969da"/>
+  <circle cx="352" cy="162" r="4" fill="#0969da"/>
+  <circle cx="426" cy="148" r="4" fill="#0969da"/>
+  <circle cx="500" cy="168" r="4" fill="#0969da"/>
+  <circle cx="574" cy="156" r="4" fill="#0969da"/>
+  <circle cx="722" cy="152" r="4" fill="#0969da"/>
+  <!-- breakpoints -->
+  <circle cx="278" cy="262" r="6" fill="#bc4c00"/>
+  <circle cx="648" cy="268" r="6" fill="#bc4c00"/>
+  <text x="278" y="300" text-anchor="middle" font-size="12" fill="#bc4c00">topic shift</text>
+  <text x="648" y="300" text-anchor="middle" font-size="12" fill="#bc4c00">topic shift</text>
+
+  <!-- cut lines through sentence row -->
+  <line x1="278" y1="52" x2="278" y2="256" stroke="#bc4c00" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="648" y1="52" x2="648" y2="262" stroke="#bc4c00" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+  <!-- chunk braces -->
+  <path d="M62 320 L62 330 L272 330 L272 320" fill="none" stroke="#7d8590" stroke-width="1.5"/>
+  <path d="M284 320 L284 330 L642 330 L642 320" fill="none" stroke="#7d8590" stroke-width="1.5"/>
+  <path d="M654 320 L654 330 L790 330 L790 320" fill="none" stroke="#7d8590" stroke-width="1.5"/>
+  <text x="167" y="352" text-anchor="middle" font-size="14" font-weight="600" fill="#7d8590">Chunk 1</text>
+  <text x="463" y="352" text-anchor="middle" font-size="14" font-weight="600" fill="#7d8590">Chunk 2</text>
+  <text x="722" y="352" text-anchor="middle" font-size="14" font-weight="600" fill="#7d8590">Chunk 3</text>
+
+  <text x="430" y="386" text-anchor="middle" font-size="12" fill="#7d8590">Where the similarity between neighbors dips below the threshold, a new chunk begins.</text>
+</svg>

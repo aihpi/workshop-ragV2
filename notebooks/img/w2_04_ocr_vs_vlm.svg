@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 410" role="img" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Classic OCR matches letter shapes one by one; a VLM reads the whole page</title>
+  <defs>
+    <marker id="arwB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#0969da"/>
+    </marker>
+    <marker id="arwP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#8250df"/>
+    </marker>
+  </defs>
+  <text x="430" y="30" text-anchor="middle" font-size="19" font-weight="700" fill="#7d8590">Classic OCR vs. VLM — two ways to read a page</text>
+  <line x1="430" y1="52" x2="430" y2="380" stroke="#8b949e" stroke-dasharray="4 6"/>
+
+  <!-- ===== left: classic OCR ===== -->
+  <text x="215" y="64" text-anchor="middle" font-size="14" font-weight="700" fill="#0969da">Classic OCR — the letter-shape detective</text>
+
+  <!-- mini page with boxed glyphs -->
+  <rect x="55" y="84" width="130" height="150" rx="6" fill="#ffffff" stroke="#8b949e"/>
+  <rect x="67" y="98" width="70" height="6" fill="#57606a"/>
+  <rect x="67" y="114" width="106" height="4" fill="#afb8c1"/>
+  <rect x="67" y="126" width="106" height="4" fill="#afb8c1"/>
+  <g font-size="13" font-family="ui-monospace, Menlo, monospace">
+    <rect x="67"  y="140" width="14" height="18" fill="none" stroke="#0969da" stroke-dasharray="3 2"/><text x="74"  y="154" text-anchor="middle" fill="#1f2328">M</text>
+    <rect x="83"  y="140" width="14" height="18" fill="none" stroke="#0969da" stroke-dasharray="3 2"/><text x="90"  y="154" text-anchor="middle" fill="#1f2328">ü</text>
+    <rect x="99"  y="140" width="14" height="18" fill="none" stroke="#0969da" stroke-dasharray="3 2"/><text x="106" y="154" text-anchor="middle" fill="#1f2328">n</text>
+    <rect x="115" y="140" width="14" height="18" fill="none" stroke="#0969da" stroke-dasharray="3 2"/><text x="122" y="154" text-anchor="middle" fill="#1f2328">c</text>
+    <rect x="131" y="140" width="14" height="18" fill="none" stroke="#0969da" stroke-dasharray="3 2"/><text x="138" y="154" text-anchor="middle" fill="#1f2328">h</text>
+    <rect x="147" y="140" width="14" height="18" fill="none" stroke="#0969da" stroke-dasharray="3 2"/><text x="154" y="154" text-anchor="middle" fill="#1f2328">e</text>
+    <rect x="163" y="140" width="14" height="18" fill="none" stroke="#0969da" stroke-dasharray="3 2"/><text x="170" y="154" text-anchor="middle" fill="#1f2328">n</text>
+  </g>
+  <rect x="67" y="170" width="106" height="4" fill="#afb8c1"/>
+  <rect x="67" y="182" width="90" height="4" fill="#afb8c1"/>
+  <rect x="67" y="194" width="106" height="4" fill="#afb8c1"/>
+  <rect x="67" y="206" width="70" height="4" fill="#afb8c1"/>
+
+  <!-- shape alphabet -->
+  <rect x="255" y="110" width="96" height="96" rx="6" fill="#ffffff" stroke="#8b949e"/>
+  <text x="303" y="103" text-anchor="middle" font-size="10" fill="#7d8590">known letter shapes</text>
+  <g font-size="14" font-family="ui-monospace, Menlo, monospace" fill="#57606a">
+    <text x="273" y="136" text-anchor="middle">a</text><text x="303" y="136" text-anchor="middle">b</text><text x="333" y="136" text-anchor="middle">c</text>
+    <rect x="292" y="146" width="22" height="22" fill="#ddf4ff" stroke="#0969da"/>
+    <text x="273" y="163" text-anchor="middle">i</text><text x="303" y="163" text-anchor="middle" fill="#0969da" font-weight="700">u</text><text x="333" y="163" text-anchor="middle">n</text>
+    <text x="273" y="190" text-anchor="middle">m</text><text x="303" y="190" text-anchor="middle">o</text><text x="333" y="190" text-anchor="middle">s</text>
+  </g>
+  <line x1="92" y1="162" x2="288" y2="158" stroke="#0969da" stroke-width="1.5" marker-end="url(#arwB)"/>
+  <text x="196" y="178" text-anchor="middle" font-size="11" fill="#0969da">match glyph by glyph</text>
+
+  <!-- left output -->
+  <rect x="55" y="270" width="340" height="76" rx="8" fill="#ffffff" stroke="#8b949e"/>
+  <text x="71" y="292" font-size="11" fill="#57606a">output: plain text, no structure</text>
+  <text x="71" y="314" font-size="13" font-family="ui-monospace, Menlo, monospace" fill="#1f2328">…LSTM in <tspan fill="#cf222e" font-weight="700">Minchen</tspan>…</text>
+  <text x="71" y="336" font-size="12" fill="#cf222e">✗ "ü" misread as "i" — an unusual shape breaks it</text>
+
+  <!-- ===== right: VLM ===== -->
+  <text x="645" y="64" text-anchor="middle" font-size="14" font-weight="700" fill="#8250df">VLM — reads the whole page at once</text>
+
+  <rect x="470" y="84" width="130" height="150" rx="6" fill="#ffffff" stroke="#8b949e"/>
+  <rect x="482" y="98" width="70" height="6" fill="#57606a"/>
+  <rect x="482" y="114" width="106" height="4" fill="#afb8c1"/>
+  <rect x="482" y="126" width="106" height="4" fill="#afb8c1"/>
+  <text x="512" y="154" font-size="13" font-family="ui-monospace, Menlo, monospace" fill="#1f2328">München</text>
+  <rect x="482" y="170" width="106" height="4" fill="#afb8c1"/>
+  <rect x="482" y="182" width="90" height="4" fill="#afb8c1"/>
+  <rect x="482" y="194" width="106" height="4" fill="#afb8c1"/>
+  <rect x="482" y="206" width="70" height="4" fill="#afb8c1"/>
+  <rect x="462" y="76" width="146" height="166" rx="10" fill="none" stroke="#8250df" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="535" y="256" text-anchor="middle" font-size="11" fill="#8250df">the whole page in one look</text>
+
+  <rect x="660" y="130" width="90" height="46" rx="8" fill="#fbefff" stroke="#8250df" stroke-width="1.5"/>
+  <circle cx="684" cy="153" r="5" fill="#8250df"/>
+  <circle cx="705" cy="145" r="5" fill="#8250df"/>
+  <circle cx="705" cy="161" r="5" fill="#8250df"/>
+  <line x1="688" y1="151" x2="700" y2="146" stroke="#8250df"/>
+  <line x1="688" y1="155" x2="700" y2="160" stroke="#8250df"/>
+  <text x="726" y="158" font-size="12" font-weight="600" fill="#8250df">VLM</text>
+  <line x1="612" y1="153" x2="655" y2="153" stroke="#8250df" stroke-width="1.5" marker-end="url(#arwP)"/>
+
+  <!-- right output -->
+  <rect x="470" y="270" width="350" height="96" rx="8" fill="#ffffff" stroke="#8b949e"/>
+  <text x="486" y="290" font-size="11" fill="#57606a">output: structured Markdown</text>
+  <g font-size="12" font-family="ui-monospace, Menlo, monospace" fill="#1f2328">
+    <text x="486" y="309">## <tspan fill="#1a7f37" font-weight="700">München</tspan></text>
+    <text x="486" y="326">| RTRL | 3 | ≈ 170 |</text>
+    <text x="486" y="343">$O(1)$</text>
+  </g>
+  <text x="640" y="326" font-size="12" fill="#1a7f37">✓ heading, table and</text>
+  <text x="640" y="343" font-size="12" fill="#1a7f37">formula preserved</text>
+
+  <text x="430" y="394" text-anchor="middle" font-size="12" fill="#7d8590">Shape matching is fast and local; page understanding is slower — but keeps meaning and structure.</text>
+</svg>

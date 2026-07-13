@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 440" role="img" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Four ways to read a scanned page, converging into one comparison</title>
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#7d8590"/>
+    </marker>
+  </defs>
+  <text x="430" y="30" text-anchor="middle" font-size="19" font-weight="700" fill="#7d8590">Four ways to read a scanned page</text>
+
+  <!-- PDF icon -->
+  <path d="M50 130 L120 130 L140 150 L140 250 L50 250 Z" fill="#ffffff" stroke="#8b949e" stroke-width="1.5"/>
+  <path d="M120 130 L120 150 L140 150" fill="none" stroke="#8b949e" stroke-width="1.5"/>
+  <rect x="62" y="165" width="62" height="4" fill="#afb8c1"/>
+  <rect x="62" y="178" width="66" height="4" fill="#afb8c1"/>
+  <rect x="62" y="191" width="54" height="4" fill="#afb8c1"/>
+  <rect x="62" y="204" width="66" height="4" fill="#afb8c1"/>
+  <rect x="62" y="217" width="40" height="4" fill="#afb8c1"/>
+  <text x="95" y="270" text-anchor="middle" font-size="11" font-family="ui-monospace, Menlo, monospace" fill="#7d8590">lstm_tables.pdf</text>
+  <text x="95" y="285" text-anchor="middle" font-size="11" fill="#7d8590">scanned LSTM paper</text>
+
+  <!-- four approach boxes -->
+  <rect x="240" y="60" width="290" height="52" rx="8" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text x="254" y="82" font-size="13" font-weight="600" fill="#1f2328">A · Docling + RapidOCR</text>
+  <text x="254" y="99" font-size="11" fill="#57606a">local · fast · free</text>
+
+  <rect x="240" y="130" width="290" height="52" rx="8" fill="#fbefff" stroke="#8250df" stroke-width="1.5"/>
+  <text x="254" y="152" font-size="13" font-weight="600" fill="#1f2328">B · Docling VLM (granite_docling)</text>
+  <text x="254" y="169" font-size="11" fill="#57606a">local · private — nothing leaves your machine</text>
+
+  <rect x="240" y="200" width="290" height="52" rx="8" fill="#fff1e5" stroke="#bc4c00" stroke-width="1.5"/>
+  <text x="254" y="222" font-size="13" font-weight="600" fill="#1f2328">C · External VLM (direct)</text>
+  <text x="254" y="239" font-size="11" fill="#57606a">cloud · best quality · $ per page</text>
+
+  <rect x="240" y="270" width="290" height="52" rx="8" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+  <text x="254" y="292" font-size="13" font-weight="600" fill="#1f2328">D · Docling ApiVlm</text>
+  <text x="254" y="309" font-size="11" fill="#57606a">cloud · adds structured JSON output</text>
+
+  <!-- fan-out arrows -->
+  <line x1="145" y1="190" x2="235" y2="86"  stroke="#7d8590" stroke-width="1.5" marker-end="url(#arw)"/>
+  <line x1="145" y1="190" x2="235" y2="156" stroke="#7d8590" stroke-width="1.5" marker-end="url(#arw)"/>
+  <line x1="145" y1="190" x2="235" y2="226" stroke="#7d8590" stroke-width="1.5" marker-end="url(#arw)"/>
+  <line x1="145" y1="190" x2="235" y2="296" stroke="#7d8590" stroke-width="1.5" marker-end="url(#arw)"/>
+
+  <!-- converge arrows -->
+  <line x1="533" y1="86"  x2="600" y2="170" stroke="#7d8590" stroke-width="1.5" marker-end="url(#arw)"/>
+  <line x1="533" y1="156" x2="600" y2="185" stroke="#7d8590" stroke-width="1.5" marker-end="url(#arw)"/>
+  <line x1="533" y1="226" x2="600" y2="200" stroke="#7d8590" stroke-width="1.5" marker-end="url(#arw)"/>
+  <line x1="533" y1="296" x2="600" y2="215" stroke="#7d8590" stroke-width="1.5" marker-end="url(#arw)"/>
+
+  <!-- comparison box -->
+  <rect x="606" y="150" width="220" height="82" rx="8" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text x="716" y="182" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2328">Comparison (sections 7–8)</text>
+  <text x="716" y="202" text-anchor="middle" font-size="11" fill="#57606a">metrics · runtime · agreement</text>
+  <text x="716" y="218" text-anchor="middle" font-size="11" fill="#57606a">tables &amp; formulas in detail</text>
+
+  <!-- trade-off inset -->
+  <rect x="560" y="262" width="270" height="150" rx="8" fill="#ffffff" stroke="#8b949e"/>
+  <text x="695" y="284" text-anchor="middle" font-size="12" font-weight="600" fill="#57606a">the trade-off</text>
+  <line x1="592" y1="386" x2="810" y2="386" stroke="#7d8590" stroke-width="1.5" marker-end="url(#arw)"/>
+  <line x1="592" y1="386" x2="592" y2="296" stroke="#7d8590" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text x="810" y="402" text-anchor="end" font-size="10" fill="#7d8590">faster / cheaper →</text>
+  <text x="586" y="300" text-anchor="end" font-size="10" fill="#7d8590" transform="rotate(-90 586 300)">fidelity →</text>
+  <circle cx="778" cy="366" r="5" fill="#0969da"/><text x="778" y="356" text-anchor="middle" font-size="10" fill="#0969da">RapidOCR</text>
+  <circle cx="700" cy="344" r="5" fill="#8250df"/><text x="700" y="334" text-anchor="middle" font-size="10" fill="#8250df">granite</text>
+  <circle cx="626" cy="308" r="5" fill="#bc4c00"/><text x="648" y="304" font-size="10" fill="#bc4c00">external VLM</text>
+  <circle cx="640" cy="320" r="5" fill="#1a7f37"/><text x="662" y="326" font-size="10" fill="#1a7f37">ApiVlm</text>
+
+  <text x="290" y="392" font-size="12" fill="#7d8590">Speed &amp; cost vs. structural and character</text>
+  <text x="290" y="408" font-size="12" fill="#7d8590">fidelity — the core theme of this notebook.</text>
+</svg>

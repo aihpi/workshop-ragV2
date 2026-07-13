@@ -10,7 +10,7 @@ __pycache__/
 
 # Secrets
 .env
-processed/
+
 
 #
 tmp/*

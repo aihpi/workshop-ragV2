@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 320" role="img" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Models count tokens, not characters</title>
+  <text x="430" y="30" text-anchor="middle" font-size="19" font-weight="700" fill="#7d8590">Models count tokens, not characters</text>
+
+  <!-- top: characters -->
+  <text x="40" y="68" font-size="14" font-weight="600" fill="#7d8590">What we see: characters</text>
+  <rect x="40" y="80" width="780" height="40" rx="6" fill="#ffffff" stroke="#8b949e"/>
+  <text x="56" y="105" font-size="13" font-family="ui-monospace, Menlo, monospace" fill="#1f2328">Die Verschlüsselung der Schlüssel erfolgt gemäß BSI-Standard 200-1 und wird regelmäßig geprüft …</text>
+  <line x1="105" y1="120" x2="105" y2="128" stroke="#8b949e"/>
+  <line x1="170" y1="120" x2="170" y2="128" stroke="#8b949e"/>
+  <line x1="235" y1="120" x2="235" y2="128" stroke="#8b949e"/>
+  <line x1="300" y1="120" x2="300" y2="128" stroke="#8b949e"/>
+  <line x1="365" y1="120" x2="365" y2="128" stroke="#8b949e"/>
+  <line x1="430" y1="120" x2="430" y2="128" stroke="#8b949e"/>
+  <line x1="495" y1="120" x2="495" y2="128" stroke="#8b949e"/>
+  <line x1="560" y1="120" x2="560" y2="128" stroke="#8b949e"/>
+  <line x1="625" y1="120" x2="625" y2="128" stroke="#8b949e"/>
+  <line x1="690" y1="120" x2="690" y2="128" stroke="#8b949e"/>
+  <line x1="755" y1="120" x2="755" y2="128" stroke="#8b949e"/>
+  <text x="430" y="145" text-anchor="middle" font-size="13" fill="#7d8590">"1,200 characters — should fit … right?"</text>
+
+  <!-- bottom: tokens -->
+  <text x="40" y="188" font-size="14" font-weight="600" fill="#7d8590">What the model sees: tokens</text>
+  <g font-size="12" font-family="ui-monospace, Menlo, monospace">
+    <rect x="40"  y="200" width="42"  height="30" rx="5" fill="#ddf4ff" stroke="#0969da"/><text x="61"  y="220" text-anchor="middle" fill="#1f2328">Die</text>
+    <rect x="88"  y="200" width="50"  height="30" rx="5" fill="#ddf4ff" stroke="#0969da"/><text x="113" y="220" text-anchor="middle" fill="#1f2328">_Ver</text>
+    <rect x="144" y="200" width="88"  height="30" rx="5" fill="#ddf4ff" stroke="#0969da"/><text x="188" y="220" text-anchor="middle" fill="#1f2328">schlüsse</text>
+    <rect x="238" y="200" width="54"  height="30" rx="5" fill="#ddf4ff" stroke="#0969da"/><text x="265" y="220" text-anchor="middle" fill="#1f2328">lung</text>
+    <rect x="298" y="200" width="54"  height="30" rx="5" fill="#ddf4ff" stroke="#0969da"/><text x="325" y="220" text-anchor="middle" fill="#1f2328">_der</text>
+    <rect x="358" y="200" width="66"  height="30" rx="5" fill="#ddf4ff" stroke="#0969da"/><text x="391" y="220" text-anchor="middle" fill="#1f2328">_Schl</text>
+    <rect x="430" y="200" width="66"  height="30" rx="5" fill="#ddf4ff" stroke="#0969da"/><text x="463" y="220" text-anchor="middle" fill="#1f2328">üssel</text>
+    <rect x="502" y="200" width="88"  height="30" rx="5" fill="#ddf4ff" stroke="#0969da"/><text x="546" y="220" text-anchor="middle" fill="#1f2328">_erfolgt</text>
+    <rect x="596" y="200" width="42"  height="30" rx="5" fill="#ddf4ff" stroke="#0969da"/><text x="617" y="220" text-anchor="middle" fill="#1f2328">_g</text>
+    <rect x="662" y="200" width="66"  height="30" rx="5" fill="#ffebe9" stroke="#cf222e"/><text x="695" y="220" text-anchor="middle" fill="#cf222e">emäß</text>
+    <rect x="734" y="200" width="54"  height="30" rx="5" fill="#ffebe9" stroke="#cf222e"/><text x="761" y="220" text-anchor="middle" fill="#cf222e">_BSI</text>
+    <rect x="794" y="200" width="36"  height="30" rx="5" fill="#ffebe9" stroke="#cf222e"/><text x="812" y="220" text-anchor="middle" fill="#cf222e">…</text>
+  </g>
+
+  <!-- budget line -->
+  <line x1="650" y1="182" x2="650" y2="248" stroke="#bc4c00" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="646" y="176" text-anchor="end" font-size="12" fill="#bc4c00">512-token budget</text>
+
+  <!-- cut-off bracket -->
+  <path d="M662 244 L662 252 L830 252 L830 244" fill="none" stroke="#cf222e" stroke-width="1.5"/>
+  <text x="746" y="272" text-anchor="middle" font-size="13" fill="#cf222e">silently cut off — no error, just missing</text>
+
+  <text x="430" y="304" text-anchor="middle" font-size="12" fill="#7d8590">A chunk that "fits" in characters can still overflow the token budget — the HybridChunker counts tokens directly.</text>
+</svg>

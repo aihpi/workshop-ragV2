@@ -1,0 +1,16 @@
+[
+  {
+    "picture_index": 1,
+    "page_numbers": [
+      2
+    ],
+    "description": "```markdown\n# Neural Network Unit Diagram\n\n## Structure\nThis diagram represents a single neuron or processing unit in a neural network, showing the flow of signals and weights.\n\n- **Inputs**: `net_c` (context input) and `y_in` (previous output or recurrent input) enter the unit.\n- **Weights**: \n  - `w_c,i` connects `net_c` to gate `g`.\n  - `w_in,i` connects `y_in` to `net_in`.\n  - `w_out,i` connects `y_out` to `net` (output).\n- **Gates**:\n  - `g` (gate) modulates the context input.\n  - `h` (gate) modulates the output.\n- **Operations**:\n  - `g * y_in` → multiplied by 1.0 (identity) → passed to `h`.\n  - `s_c = s_c + g * y_in` (state update).\n- **Outputs**: `y_out` (activated output) and `net` (final output signal).\n\n## Key Takeaway\nThis is a **gated recurrent unit (GRU)**-like structure, where:\n- The context `net_c` is gated by `g`.\n- The previous output `y_in` is gated and added to the state `s_c`.\n- The output `y_out` is gated by `h` before being passed to the next layer or time step.\n- The unit combines recurrent feedback (`y_in`) with gated control over state updates and outputs.\n\nThis design enables selective memory and information flow, crucial for sequence modeling.\n```"
+  },
+  {
+    "picture_index": 2,
+    "page_numbers": [
+      4
+    ],
+    "description": "```markdown\n# Figure Description: Recurrent Neural Network (RNN) with Multiple Cells and Blocks\n\n## Structure\n\nThis diagram illustrates a **Recurrent Neural Network (RNN)** architecture with:\n\n- **Input layer**: Bottom row of circles labeled \"input\".\n- **Hidden layer**: Middle section containing two **blocks** (Block 1 and Block 2), each with two **cells** (Cell 1 and Cell 2). Each cell has internal feedback loops (self-loops) and connections to other cells within the same block.\n- **Output layer**: Top row of circles labeled \"output\".\n\n### Key Connections:\n\n- **Feedforward connections**: Input → hidden cells → output.\n- **Recurrent connections**: Each cell has a self-loop (indicated by curved arrows), representing temporal memory.\n- **Cross-block connections**: Cells in Block 1 connect to cells in Block 2, suggesting information flow between blocks.\n- **Output connections**: All hidden cells project to all output units.\n\n## Key Takeaway\n\nThis is a **multi-cell, multi-block RNN** with **internal recurrence** and **inter-block communication**, designed to process sequential data. The architecture enables complex temporal dynamics and feature extraction across time steps, suitable for tasks like sequence modeling, language processing, or time-series prediction.\n\nThe diagram emphasizes **modular design** (blocks of cells) and **rich connectivity** (feedforward, recurrent, and cross-block), highlighting the network’s capacity for learning long-term dependencies and hierarchical representations.\n```"
+  }
+]

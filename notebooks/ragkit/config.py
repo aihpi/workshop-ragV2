@@ -1,4 +1,4 @@
-"""Shared configuration for Workshop 3 (RAG Evaluation) notebooks.
+"""Shared configuration for the workshop notebooks.
 
 Loads environment variables from .env, defines path constants,
 model names, and infrastructure settings. Prints a configuration
@@ -8,18 +8,19 @@ summary at import time.
 import os
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # Repository-Root finden
 # ---------------------------------------------------------------------------
 
-def find_repo_root(start: Path = Path.cwd()) -> Path:
+def find_repo_root(start: Path | None = None) -> Path:
     """Walk up the directory tree to find the repository root.
 
     The root is identified by the presence of a 'docker-compose.yml' file.
 
     Args:
-        start: Directory to start searching from. Defaults to cwd.
+        start: Directory to start searching from. Defaults to this file's own
+            location, so the paths below are correct regardless of the working
+            directory Jupyter was launched from.
 
     Returns:
         Path to the repository root directory.
@@ -27,7 +28,7 @@ def find_repo_root(start: Path = Path.cwd()) -> Path:
     Raises:
         RuntimeError: If no docker-compose.yml is found in any parent.
     """
-    current = start.resolve()
+    current = (start or Path(__file__).parent).resolve()
     for candidate in [current, *current.parents]:
         if (candidate / 'docker-compose.yml').exists():
             return candidate
